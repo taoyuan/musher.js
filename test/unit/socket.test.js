@@ -57,14 +57,14 @@ describe('musher', function () {
         });
 
         it('should sub and pub with different socket', function (done) {
-            var publishSocket = s.connect();
+            var socketPub = s.connect();
             var data = {boo: 'foo'};
             var channel = socket.subscribe('tom');
             channel.on('data', function (message) {
                 t.deepEqual(data, message);
                 done();
             });
-            publishSocket.publish('tom', 'data', data);
+            socketPub.publish('tom', 'data', data);
         });
     });
 
@@ -80,14 +80,14 @@ describe('musher', function () {
         });
 
         it('should sub and pub with key', function (done) {
-            var publishSocket = s.connect('hello');
+            var socketPub = s.connect('hello');
             var data = {boo: 'foo'};
             var channel = socket.subscribe('/chat/secret');
             channel.on('data', function (message) {
                 t.deepEqual(data, message);
                 done();
             });
-            publishSocket.publish('/chat/secret', 'data', data);
+            socketPub.publish('/chat/secret', 'data', data);
         });
 
     });
