@@ -1,0 +1,32 @@
+{
+  "name": "musher",
+  "main": "dist/musher.js",
+  "version": "0.0.1",
+  "homepage": "https://github.com/taoyuan/musher",
+  "authors": [
+    "taoyuan <torworx@gmail.com>"
+  ],
+  "description": "A notification push client based on mqtt for node.js and browser.",
+  "moduleType": [
+    "node"
+  ],
+  "keywords": [
+    "mqtt",
+    "push",
+    "notification",
+    "realtime",
+    "node",
+    "browser"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "bower-mqttws": "*"
+  }
+}

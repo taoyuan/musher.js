@@ -1,4 +1,12 @@
-musher-js
-=========
+Musher Javascript and Node.js Library
+======
 
-Musher Javascript library for node.js and browser based on mqtt. Musher is a hosted API for quickly, easily and securely adding scalable realtime functionality to web and mobile apps.
+Musher Javascript and Node.js library based on mqtt.
+
+## Build
+```bash
+npm install
+grunt
+```
+The built libraries will be in `build` directory
+
