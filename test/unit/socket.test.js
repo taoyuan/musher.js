@@ -2,7 +2,7 @@ var s = require('../support');
 var t = s.t;
 
 
-describe('musher', function () {
+describe('socket', function () {
 
     var server;
 

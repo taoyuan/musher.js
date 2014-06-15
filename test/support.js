@@ -11,8 +11,7 @@ exports.connect = function (key, options) {
         key = undefined;
     }
     return musher.connect(key, musher.utils.assign({
-        host: 'localhost',
-        port: 1883
+        host: '127.0.0.1'
     }, options));
 };
 

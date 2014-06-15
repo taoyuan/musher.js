@@ -4,7 +4,7 @@ var mush = require('mush');
 var s = require('../support');
 var t = s.t;
 
-describe('socket-mush', function () {
+describe('integration', function () {
 
     var server = null,
         args = null;
@@ -27,16 +27,15 @@ describe('socket-mush', function () {
         });
     };
 
-    it.only('should support app key and secret for secure subscribe and publish', function (done) {
-        args.push("-i");
+    it('should support key and secret for secure subscribe and publish', function (done) {
         args.push("--auth");
-        args.push(__dirname + "/auth.json");
+        args.push("test/auth.json");
 
         startServer(function (err, server) {
             t.notOk(err);
             var socketSub = s.connect('test_key');
             var data = {boo: 'foo'};
-            var channel = socketSub.subscribe('/chat/secret');
+            var channel = socketSub.subscribe('chat/secret');
             channel.on('data', function (message) {
                 t.deepEqual(data, message);
                 done();
@@ -46,7 +45,7 @@ describe('socket-mush', function () {
                 key: 'test_key',
                 secret: 'kyte7mewy230faey2use'
             });
-            socketPub.publish('/chat/secret', 'data', data);
+            socketPub.publish('chat/secret', 'data', data);
         });
     });
 

@@ -1,11 +1,11 @@
 /***********************************************
-* Musher Javascript and Node.js Library v0.0.1
+* Musher Javascript and Node.js Library v0.0.2
 * https://github.com/taoyuan/musher
 * 
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-06-14 22:51
+* Date: 2014-06-15 10:17
 ***********************************************/
 /*******************************************************************************
  * Copyright (c) 2013 IBM Corp.
@@ -2609,8 +2609,8 @@ Messaging = (function (global) {
 
         function parseAuthOptions(auth, opts) {
             if(auth){
-                if (auth.appId) {
-                    opts.username = auth.appId;
+                if (auth.key) {
+                    opts.username = auth.key;
                 }
                 if (auth.secret) {
                     opts.password = auth.secret;
