@@ -5,7 +5,7 @@
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-06-15 10:17
+* Date: 2014-06-15 15:06
 ***********************************************/
 /*******************************************************************************
  * Copyright (c) 2013 IBM Corp.
@@ -2033,8 +2033,8 @@ Messaging = (function (global) {
         function initialize(socket, utils) {
             var settings = socket.settings || {};
 
-            var port = Number(settings.port || 1883);
-            var host = settings.host || '127.0.0.1';
+            var port = Number(settings.port || 2883);
+            var host = settings.host;
             var clientId = settings.clientId || utils.makeId();
 
             var client = socket.client = new Messaging.Client(host, port, clientId);
@@ -2050,8 +2050,11 @@ Messaging = (function (global) {
                 socket._connected();
             }
 
-            var connectOptions = utils.assign({ onSuccess: onConnected }, settings.options);
-            client.connect(connectOptions);
+            var opts = utils.assign({ onSuccess: onConnected }, settings.options);
+            if ('useSSL' in settings) {
+                opts.useSSL = settings.useSSL;
+            }
+            client.connect(opts);
 
             socket.adapter = new Paho(client);
         }
@@ -2204,7 +2207,7 @@ Messaging = (function (global) {
     define(function () {
         return function () {
             return {
-                host: 'musher.ollo.io'
+                host: 'musher.io'
             }
         }
     });
@@ -2404,6 +2407,9 @@ Messaging = (function (global) {
             this.key = settings.key;
             this.topicKey = this.key ? '$' + this.key + ':' : null;
 
+            if ('useSSL' in settings) {
+                settings.useSSL = settings.ssl || settings.secure;
+            }
             settings.options = settings.options || {};
             utils.parseAuthOptions(settings, settings.options);
 

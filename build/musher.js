@@ -5,7 +5,7 @@
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-06-15 10:17
+* Date: 2014-06-15 15:06
 ***********************************************/
 !function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.musher=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
 (function (define) {
@@ -20,8 +20,8 @@
         function initialize(socket, utils) {
             var settings = socket.settings || {};
 
-            var port = Number(settings.port || 1883);
-            var host = settings.host || '127.0.0.1';
+            var port = Number(settings.port || 2883);
+            var host = settings.host;
             var clientId = settings.clientId || utils.makeId();
 
             var client = socket.client = new Messaging.Client(host, port, clientId);
@@ -37,8 +37,11 @@
                 socket._connected();
             }
 
-            var connectOptions = utils.assign({ onSuccess: onConnected }, settings.options);
-            client.connect(connectOptions);
+            var opts = utils.assign({ onSuccess: onConnected }, settings.options);
+            if ('useSSL' in settings) {
+                opts.useSSL = settings.useSSL;
+            }
+            client.connect(opts);
 
             socket.adapter = new Paho(client);
         }
@@ -191,7 +194,7 @@
     define(function () {
         return function () {
             return {
-                host: 'musher.ollo.io'
+                host: 'musher.io'
             }
         }
     });
@@ -391,6 +394,9 @@
             this.key = settings.key;
             this.topicKey = this.key ? '$' + this.key + ':' : null;
 
+            if ('useSSL' in settings) {
+                settings.useSSL = settings.ssl || settings.secure;
+            }
             settings.options = settings.options || {};
             utils.parseAuthOptions(settings, settings.options);
 
