@@ -1,12 +1,5 @@
 var Socket = require('../lib/socket');
 
-Socket.defaults({
-    host: 'sock.musher.im',
-    port: 3883
-});
-
-exports.utils = require('../lib/utils');
-
 exports.connect = function (key, settings) {
     if (typeof key === 'object') {
         settings = key;
@@ -18,3 +11,4 @@ exports.connect = function (key, settings) {
 };
 
 exports.Socket = Socket;
+exports.utils = require('../lib/utils');

@@ -5,7 +5,7 @@
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-06-15 15:06
+* Date: 2014-06-15 22:49
 ***********************************************/
 /*******************************************************************************
  * Copyright (c) 2013 IBM Corp.
@@ -2632,13 +2632,6 @@ Messaging = (function (global) {
 },{}],8:[function(_dereq_,module,exports){
 var Socket = _dereq_('../lib/socket');
 
-Socket.defaults({
-    host: 'sock.musher.im',
-    port: 3883
-});
-
-exports.utils = _dereq_('../lib/utils');
-
 exports.connect = function (key, settings) {
     if (typeof key === 'object') {
         settings = key;
@@ -2650,6 +2643,7 @@ exports.connect = function (key, settings) {
 };
 
 exports.Socket = Socket;
+exports.utils = _dereq_('../lib/utils');
 
 },{"../lib/adapters/paho":1,"../lib/socket":6,"../lib/utils":7}]},{},[8])
 (8)
