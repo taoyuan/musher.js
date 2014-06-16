@@ -44,7 +44,7 @@
     "karma-script-launcher": "^0.1.0",
     "mocha": "^1.20.1",
     "mosca": "^0.21.4",
-    "mush": "taoyuan/mush"
+    "mostel": "taoyuan/mostel"
   },
   "scripts": {
     "postinstall": "node_modules/.bin/bower install"

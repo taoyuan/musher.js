@@ -1,6 +1,6 @@
 "use strict";
 
-var mush = require('mush');
+var mostel = require('mostel');
 var s = require('../support');
 var t = s.t;
 
@@ -10,7 +10,7 @@ describe('integration', function () {
         args = null;
 
     beforeEach(function () {
-        args = ["node", "mush"];
+        args = ["node", "mostel"];
     });
 
     afterEach(function (done) {
@@ -21,15 +21,15 @@ describe('integration', function () {
     });
 
     var startServer = function (callback) {
-        return mush.cli(args, function (err, s) {
+        return mostel.cli(args, function (err, s) {
             server = s;
             callback(err, server);
         });
     };
 
     it('should support key and secret for secure subscribe and publish', function (done) {
-        args.push("--auth");
-        args.push("test/auth.json");
+        args.push("--creds");
+        args.push("test/creds.json");
 
         startServer(function (err, server) {
             t.notOk(err);
