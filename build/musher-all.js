@@ -5,7 +5,7 @@
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-06-16 15:19
+* Date: 2014-06-16 16:46
 ***********************************************/
 /*******************************************************************************
  * Copyright (c) 2013 IBM Corp.
@@ -2032,10 +2032,14 @@ Messaging = (function (global) {
 
         function initialize(socket, utils) {
             var settings = socket.settings || {};
+            var options = settings.options || {};
 
             var port = Number(settings.port || 3883);
             var host = settings.host;
             var clientId = settings.clientId || utils.makeId();
+
+            if (settings.key) options.userName = settings.key;
+            if (settings.secret) options.password = settings.secret;
 
             var client = socket.client = new Messaging.Client(host, port, clientId);
 
@@ -2050,7 +2054,7 @@ Messaging = (function (global) {
                 socket._connected();
             }
 
-            var opts = utils.assign({ onSuccess: onConnected }, settings.options);
+            var opts = utils.assign({ onSuccess: onConnected }, options);
             if ('useSSL' in settings) {
                 opts.useSSL = settings.useSSL;
             }
@@ -2411,7 +2415,6 @@ Messaging = (function (global) {
                 settings.useSSL = settings.ssl || settings.secure;
             }
             settings.options = settings.options || {};
-            utils.parseAuthOptions(settings, settings.options);
 
             this.queue = [];
 

@@ -1,6 +1,6 @@
 var chai = require('chai');
 var t = chai.assert;
-var mosca = require('mosca');
+var mostel = require('mostel');
 var musher = require('../');
 
 exports.t = t;
@@ -15,6 +15,14 @@ exports.connect = function (key, options) {
     }, options));
 };
 
+var OPTIONS = ['http-port'];
+function isValidOptions(option) {
+    for (var i = 0; i < OPTIONS.length; i++) {
+        if (option == OPTIONS[i]) return true;
+    }
+    return false;
+}
+
 exports.start = function (options, cb) {
     if (typeof options === 'function') {
         cb = options;
@@ -23,14 +31,13 @@ exports.start = function (options, cb) {
     options = options || {};
     cb = cb || function () {};
 
-    var server = new mosca.Server(options);   //here we start mosca
-    server.on('ready', setup);  //on init it fires up setup()
-
-    // fired when the mqtt server is ready
-    function setup() {
-        if (cb.length > 0) return cb(server);
-        return cb();
+    console.log(options);
+    var args = ['node', 'mostel'];
+    for (var key in options) if (options.hasOwnProperty(key) && isValidOptions(key)) {
+        args.push('--' + key);
+        args.push(options[key]);
     }
 
-    return server;
+    mostel.cli(args, cb);
+
 };

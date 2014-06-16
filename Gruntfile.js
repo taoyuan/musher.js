@@ -22,27 +22,26 @@ module.exports = function (grunt) {
         execute: {
             startMosca: {
                 options: {
-                    http: {
-                        port: 3883 // ws listen port
-                    }
+                    "http-port": 3883 // ws listen port
                 },
                 call: function (grunt, options, async) {
                     var done = async();
-                    grunt._mosca_server = require('./test/support').start(options, function () {
-                        console.log('Mosca server is up and running');
+                    require('./test/support').start(options, function (err, server) {
+                        console.log('Mostel server is up and running');
+                        grunt.mostelServer = server;
                         done();
                     });
                 }
             },
             stopMosca: {
                 call: function (grunt, options, async) {
-                    if (grunt._mosca_server) {
+                    if (grunt.mostelServer) {
                         var done = async();
-                        grunt._mosca_server.close(function () {
-                            console.log('Mosca server is closed');
+                        grunt.mostelServer.close(function () {
+                            console.log('Mostel server is closed');
                             done();
                         });
-                        grunt._mosca_server = null;
+                        grunt.mostelServer = null;
                     }
                 }
             }

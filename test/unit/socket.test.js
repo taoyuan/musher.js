@@ -7,7 +7,10 @@ describe('socket', function () {
     var server;
 
     before(function (done) {
-        server = s.start(function () {done();});
+        s.start(function (err, _server) {
+            server = _server;
+            done();
+        });
     });
 
     after(function () {
@@ -19,7 +22,7 @@ describe('socket', function () {
         var socket;
 
         beforeEach(function () {
-            socket = s.connect();
+            socket = s.connect('test_key');
         });
 
         afterEach(function (done) {
@@ -57,7 +60,7 @@ describe('socket', function () {
         });
 
         it('should sub and pub with different socket', function (done) {
-            var socketPub = s.connect();
+            var socketPub = s.connect('test_key');
             var data = {boo: 'foo'};
             var channel = socket.subscribe('tom');
             channel.on('data', function (message) {
@@ -66,30 +69,6 @@ describe('socket', function () {
             });
             socketPub.publish('tom', 'data', data);
         });
-    });
-
-    describe('with key', function () {
-        var socket;
-
-        beforeEach(function () {
-            socket = s.connect('hello');
-        });
-
-        afterEach(function (done) {
-            socket.close(done);
-        });
-
-        it('should sub and pub with key', function (done) {
-            var socketPub = s.connect('hello');
-            var data = {boo: 'foo'};
-            var channel = socket.subscribe('/chat/secret');
-            channel.on('data', function (message) {
-                t.deepEqual(data, message);
-                done();
-            });
-            socketPub.publish('/chat/secret', 'data', data);
-        });
-
     });
 
 
