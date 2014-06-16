@@ -1,11 +1,11 @@
 /***********************************************
-* Musher Javascript and Node.js Library v0.0.6
+* Musher Javascript and Node.js Library v0.0.7
 * https://github.com/taoyuan/musher
 * 
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-06-16 18:39
+* Date: 2014-06-16 21:24
 ***********************************************/
 /*******************************************************************************
  * Copyright (c) 2013 IBM Corp.
@@ -2411,8 +2411,9 @@ Messaging = (function (global) {
             this.key = settings.key;
             this.topicKey = this.key ? '$' + this.key + ':' : null;
 
-            if ('useSSL' in settings) {
-                settings.useSSL = settings.ssl || settings.secure;
+            var useSSL = settings.ssl || settings.secure;
+            if (useSSL !== null && useSSL !== undefined) {
+                settings.useSSL = !!useSSL;
             }
             settings.options = settings.options || {};
 
