@@ -1,11 +1,11 @@
 /***********************************************
-* Musher Javascript and Node.js Library v0.0.3
+* Musher Javascript and Node.js Library v0.0.4
 * https://github.com/taoyuan/musher
 * 
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-06-16 15:14
+* Date: 2014-06-16 15:19
 ***********************************************/
 /*******************************************************************************
  * Copyright (c) 2013 IBM Corp.
@@ -2033,7 +2033,7 @@ Messaging = (function (global) {
         function initialize(socket, utils) {
             var settings = socket.settings || {};
 
-            var port = Number(settings.port || 2883);
+            var port = Number(settings.port || 3883);
             var host = settings.host;
             var clientId = settings.clientId || utils.makeId();
 
