@@ -1,11 +1,11 @@
 /***********************************************
-* Musher Javascript and Node.js Library v0.0.2
+* Musher Javascript and Node.js Library v0.0.3
 * https://github.com/taoyuan/musher
 * 
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-06-15 22:49
+* Date: 2014-06-16 15:14
 ***********************************************/
 /*******************************************************************************
  * Copyright (c) 2013 IBM Corp.
@@ -2207,7 +2207,7 @@ Messaging = (function (global) {
     define(function () {
         return function () {
             return {
-                host: 'musher.io'
+                host: 'musher.ollo.io'
             }
         }
     });
