@@ -71,5 +71,19 @@ describe('socket', function () {
         });
     });
 
+    describe('subscribe on connected', function () {
 
+        it('should subscribe immediately', function (done) {
+            var socket = s.connect('test_key');
+            socket.on('connected', function () {
+                var data = {boo: 'foo'};
+                var channel = socket.subscribe('tom');
+                channel.on('data', function (message) {
+                    t.deepEqual(data, message);
+                    done();
+                });
+                socket.publish('tom', 'data', data);
+            });
+        })
+    });
 });

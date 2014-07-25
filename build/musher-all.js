@@ -1,11 +1,11 @@
 /***********************************************
-* Musher Javascript and Node.js Library v0.0.7
+* Musher Javascript and Node.js Library v0.0.8
 * https://github.com/taoyuan/musher
 * 
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-06-16 21:24
+* Date: 2014-07-25 10:55
 ***********************************************/
 /*******************************************************************************
  * Copyright (c) 2013 IBM Corp.
@@ -2482,7 +2482,7 @@ Messaging = (function (global) {
                 options = null;
             }
             var channel = this.channels.add(cname, options, this);
-            if (channel.connected) {
+            if (this.connected) {
                 channel.subscribe(cb);
             } else {
                 this._enqueue(function () {
