@@ -5,7 +5,7 @@ describe('Musher', function () {
     var socket;
 
     beforeEach(function () {
-        socket = new musher.connect('test_key', {
+        socket = musher.connect('test_key', {
             host:'127.0.0.1'
         });
     });
