@@ -66,7 +66,7 @@ module.exports = function (grunt) {
         },
         browserify: {
             options: {
-                bundleOptions: {
+                browserifyOptions: {
                     standalone: 'musher'
                 }
             },

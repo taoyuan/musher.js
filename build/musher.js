@@ -1,17 +1,20 @@
 /***********************************************
-* Musher Javascript and Node.js Library v0.0.9
+* Musher Javascript and Node.js Library v0.1.0
 * https://github.com/taoyuan/musher
 * 
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-07-28 11:01
+* Date: 2014-08-30 17:43
 ***********************************************/
-!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.musher=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
+!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.musher=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 (function (define) {
     "use strict";
 
     define(function () {
+
+        var defaultPort = 3883;
+        var defaultSecurePort = 4883;
 
         /**
          * http://git.eclipse.org/c/paho/org.eclipse.paho.mqtt.javascript.git/tree/src/mqttws31.js
@@ -21,14 +24,19 @@
             var settings = socket.settings || {};
             var options = settings.options || {};
 
-            var port = Number(settings.port || 3883);
-            var host = settings.host;
             var clientId = settings.clientId || utils.makeId();
 
             if (settings.key) options.userName = settings.key;
             if (settings.secret) options.password = settings.secret;
 
-            var client = socket.client = new Messaging.Client(host, port, clientId);
+            var opts = utils.assign({ onSuccess: onConnected }, options);
+            if ('useSSL' in settings) {
+                opts.useSSL = settings.useSSL;
+            }
+
+            settings.port = Number(settings.port || (opts.useSSL ? defaultSecurePort: defaultPort));
+
+            var client = socket.client = new Messaging.Client(settings.host, settings.port, clientId);
 
             client.onConnectionLost = function () {
                 socket._disconnected();
@@ -41,10 +49,6 @@
                 socket._connected();
             }
 
-            var opts = utils.assign({ onSuccess: onConnected }, options);
-            if ('useSSL' in settings) {
-                opts.useSSL = settings.useSSL;
-            }
             client.connect(opts);
 
             socket.adapter = new Paho(client);
@@ -82,15 +86,15 @@
     });
 
 })(typeof define === 'function' && define.amd ? define : function (factory) {
-    module.exports = factory(_dereq_);
+    module.exports = factory(require);
 });
-},{}],2:[function(_dereq_,module,exports){
+},{}],2:[function(require,module,exports){
 (function (define) {
     "use strict";
 
-    define(function (_dereq_) {
+    define(function (require) {
 
-        var Emitter = _dereq_('./emitter');
+        var Emitter = require('./emitter');
 
         function Channel(name, options, socket) {
             if (!(this instanceof Channel)) {
@@ -149,16 +153,16 @@
         return Channel;
     });
 })(typeof define === 'function' && define.amd ? define : function (factory) {
-    module.exports = factory(_dereq_);
+    module.exports = factory(require);
 });
-},{"./emitter":5}],3:[function(_dereq_,module,exports){
+},{"./emitter":4}],3:[function(require,module,exports){
 (function (define) {
     "use strict";
 
-    define(function (_dereq_) {
+    define(function (require) {
 
-        var Channel = _dereq_('./channel');
-        var utils = _dereq_('./utils');
+        var Channel = require('./channel');
+        var utils = require('./utils');
 
         function Channels(socket) {
             this.socket = socket;
@@ -199,30 +203,15 @@
         return Channels;
     });
 })(typeof define === 'function' && define.amd ? define : function (factory) {
-    module.exports = factory(_dereq_);
+    module.exports = factory(require);
 });
-},{"./channel":2,"./utils":7}],4:[function(_dereq_,module,exports){
+},{"./channel":2,"./utils":6}],4:[function(require,module,exports){
 (function (define) {
     "use strict";
 
-    define(function () {
-        return function () {
-            return {
-                host: 'musher.io'
-            }
-        }
-    });
+    define(function (require) {
 
-})(typeof define === 'function' && define.amd ? define : function (factory) {
-    module.exports = factory(_dereq_);
-});
-},{}],5:[function(_dereq_,module,exports){
-(function (define) {
-    "use strict";
-
-    define(function (_dereq_) {
-
-        var utils = _dereq_('./utils');
+        var utils = require('./utils');
 
         function Emitter() {
         }
@@ -383,28 +372,29 @@
     });
 
 })(typeof define === 'function' && define.amd ? define : function (factory) {
-    module.exports = factory(_dereq_);
+    module.exports = factory(require);
 });
-},{"./utils":7}],6:[function(_dereq_,module,exports){
+},{"./utils":6}],5:[function(require,module,exports){
 (function (define) {
     "use strict";
 
-    define(function (_dereq_) {
+    define(function (require) {
 
-        var utils = _dereq_('./utils');
-        var Emitter = _dereq_('./emitter');
-        var Channels = _dereq_('./channels');
-        var defaults = _dereq_('./defaults')();
+        var utils = require('./utils');
+        var Emitter = require('./emitter');
+        var Channels = require('./channels');
 
-        function Socket(adapter, settings) {
+        var defaultHost = 'musher.io';
+
+        function Socket(adapter, opts) {
             if (!(this instanceof Socket)) {
-                return new Socket(adapter, settings);
+                return new Socket(adapter, opts);
             }
 
             var self = this;
 
             // just save everything we get
-            this.settings = settings = utils.assign({}, defaults, settings);
+            var settings = this.settings = utils.assign({ host: defaultHost }, opts);
             this.key = settings.key;
             this.topicKey = this.key ? '$' + this.key + ':' : null;
 
@@ -525,9 +515,9 @@
         return Socket;
     });
 })(typeof define === 'function' && define.amd ? define : function (factory) {
-    module.exports = factory(_dereq_);
+    module.exports = factory(require);
 });
-},{"./channels":3,"./defaults":4,"./emitter":5,"./utils":7}],7:[function(_dereq_,module,exports){
+},{"./channels":3,"./emitter":4,"./utils":6}],6:[function(require,module,exports){
 (function (define) {
     "use strict";
 
@@ -627,10 +617,10 @@
     });
 
 })(typeof define === 'function' && define.amd ? define : function (factory) {
-    module.exports = factory(_dereq_);
+    module.exports = factory(require);
 });
-},{}],8:[function(_dereq_,module,exports){
-var Socket = _dereq_('../lib/socket');
+},{}],7:[function(require,module,exports){
+var Socket = require('../lib/socket');
 
 exports.connect = function (key, settings) {
     if (typeof key === 'object') {
@@ -639,12 +629,11 @@ exports.connect = function (key, settings) {
     }
     settings = settings || {};
     if (key) settings.key = key;
-    return new Socket(_dereq_('../lib/adapters/paho'), settings);
+    return new Socket(require('../lib/adapters/paho'), settings);
 };
 
 exports.Socket = Socket;
-exports.utils = _dereq_('../lib/utils');
+exports.utils = require('../lib/utils');
 
-},{"../lib/adapters/paho":1,"../lib/socket":6,"../lib/utils":7}]},{},[8])
-(8)
+},{"../lib/adapters/paho":1,"../lib/socket":5,"../lib/utils":6}]},{},[7])(7)
 });
