@@ -79,6 +79,39 @@ describe('socket', function () {
             });
             socketPub.publish('tom', 'data', data);
         });
+
+        it('should work with $ topic', function (done) {
+            var data = {boo: 'foo'};
+            var channel = socket.subscribe('$tom');
+            channel.on('data', function (message) {
+                t.deepEqual(data, message);
+                done();
+            });
+            socket.publish('$tom', 'data', data);
+        });
+
+//        it('should work with char +', function (done) {
+//            var data = {boo: 'foo'};
+//            var channel = socket.subscribe('foo/+');
+//            channel.on('data', function (message) {
+//                t.deepEqual(data, message);
+//                done();
+//            });
+//            socket.publish('foo/bar', 'data', data);
+//        })
+    });
+
+    describe('without key', function () {
+        it('should work', function (done) {
+            var socket = s.connect();
+            var data = {boo: 'foo'};
+            var channel = socket.subscribe('tom');
+            channel.on('data', function (message) {
+                t.deepEqual(data, message);
+                done();
+            });
+            socket.publish('tom', 'data', data);
+        });
     });
 
     describe('subscribe on connected', function () {

@@ -37,7 +37,6 @@ exports.start = function (options, cb) {
         args.push('--' + key);
         args.push(options[key]);
     }
-
     mostel.cli(args, cb);
 
 };

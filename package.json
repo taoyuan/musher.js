@@ -2,7 +2,8 @@
   "name": "musher",
   "version": "0.1.0",
   "description": "Musher Javascript and Node.js Library",
-  "main": "index.js",
+  "main": "./index.js",
+  "browser": "./browser.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/taoyuan/musher.git"
@@ -22,6 +23,8 @@
   },
   "homepage": "https://github.com/taoyuan/musher",
   "dependencies": {
+    "debug": "^1.0.4",
+    "houkou": "^0.2.1",
     "mqtt": "^0.3.11"
   },
   "devDependencies": {
@@ -48,6 +51,6 @@
   },
   "scripts": {
     "postinstall": "node_modules/.bin/bower install",
-    "test": "grunt"
+    "test": "grunt test-mocha"
   }
 }

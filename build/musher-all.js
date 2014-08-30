@@ -5,7 +5,7 @@
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-08-30 17:53
+* Date: 2014-08-30 23:01
 ***********************************************/
 // Only expose a single object name in the global namespace.
 // Everything must go through this module. Global Messaging module
@@ -2004,10 +2004,28 @@ Messaging = (function (global) {
 })(window);
 
 !function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.musher=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+var Socket = require('./lib/socket');
+
+exports.connect = function (key, settings) {
+    if (typeof key === 'object') {
+        settings = key;
+        key = null;
+    }
+    settings = settings || {};
+    if (key) settings.key = key;
+    return new Socket(require('./lib/adapters/paho'), settings);
+};
+
+exports.Socket = Socket;
+exports.utils = require('./lib/utils');
+
+},{"./lib/adapters/paho":2,"./lib/socket":6,"./lib/utils":7}],2:[function(require,module,exports){
 (function (define) {
     "use strict";
 
     define(function () {
+
+        var Emitter = require('../emitter');
 
         var defaultPort = 3883;
         var defaultSecurePort = 4883;
@@ -2018,14 +2036,13 @@ Messaging = (function (global) {
 
         function initialize(socket, utils) {
             var settings = socket.settings || {};
-            var options = settings.options || {};
+            var opts = settings.options || {};
 
             var clientId = settings.clientId || utils.makeId();
 
-            if (settings.key) options.userName = settings.key;
-            if (settings.secret) options.password = settings.secret;
+            if (settings.key) opts.userName = settings.key;
+            if (settings.secret) opts.password = settings.secret;
 
-            var opts = utils.assign({ onSuccess: onConnected }, options);
             if ('useSSL' in settings) {
                 opts.useSSL = settings.useSSL;
             }
@@ -2033,42 +2050,49 @@ Messaging = (function (global) {
             settings.port = Number(settings.port || (opts.useSSL ? defaultSecurePort: defaultPort));
 
             var client = socket.client = new Messaging.Client(settings.host, settings.port, clientId);
+            socket.adapter = new Paho(client, opts);
+        }
 
+        function Paho(client, opts) {
+            this.client = client;
+
+            var adapter = this;
             client.onConnectionLost = function () {
-                socket._disconnected();
+                adapter.emit('close');
             };
             client.onMessageArrived = function (message) {
-                socket._message(message.destinationName, message.payloadString);
+                adapter.emit('message', message.destinationName, message.payloadString);
             };
 
-            function onConnected() {
-                socket._connected();
-            }
+            opts = opts || {};
+            opts.onSuccess = function onConnected() {
+                adapter.emit('connect');
+            };
 
             client.connect(opts);
-
-            socket.adapter = new Paho(client);
         }
 
-        function Paho(client) {
-            this.client = client;
-        }
+        Emitter.extend(Paho);
 
-        Paho.prototype.subscribe = function (cname, options, cb) {
-            var opts = options || {};
+        Paho.prototype.__defineGetter__('connected', function () {
+            return this.client.connected;
+        });
+
+        Paho.prototype.subscribe = function (topic, opts, cb) {
+            opts = opts || {};
             if (cb) opts.onSuccess = cb;
-            return this.client.subscribe(cname, opts);
+            return this.client.subscribe(topic, opts);
         };
 
-        Paho.prototype.unsubscribe = function (cname, options, cb) {
-            var opts = options || {};
+        Paho.prototype.unsubscribe = function (topic, opts, cb) {
+            opts = opts || {};
             if (cb) opts.onSuccess = cb;
-            return this.client.unsubscribe(cname, opts);
+            return this.client.unsubscribe(topic, opts);
         };
 
-        Paho.prototype.publish = function (cname, message) {
+        Paho.prototype.publish = function (topic, message) {
             var m = new Messaging.Message(message);
-            m.destinationName = cname;
+            m.destinationName = topic;
             return this.client.send(m);
         };
 
@@ -2084,7 +2108,7 @@ Messaging = (function (global) {
 })(typeof define === 'function' && define.amd ? define : function (factory) {
     module.exports = factory(require);
 });
-},{}],2:[function(require,module,exports){
+},{"../emitter":5}],3:[function(require,module,exports){
 (function (define) {
     "use strict";
 
@@ -2099,7 +2123,7 @@ Messaging = (function (global) {
             this.socket = socket;
             this.key = socket.key;
             this.adapter = socket.adapter;
-            this.name = name;
+            this.name = name;//.replace(/\$/, "\\$");
             this.options = options;
             this.topic = socket._encode(this.name);
         }
@@ -2151,7 +2175,7 @@ Messaging = (function (global) {
 })(typeof define === 'function' && define.amd ? define : function (factory) {
     module.exports = factory(require);
 });
-},{"./emitter":4}],3:[function(require,module,exports){
+},{"./emitter":5}],4:[function(require,module,exports){
 (function (define) {
     "use strict";
 
@@ -2201,7 +2225,7 @@ Messaging = (function (global) {
 })(typeof define === 'function' && define.amd ? define : function (factory) {
     module.exports = factory(require);
 });
-},{"./channel":2,"./utils":6}],4:[function(require,module,exports){
+},{"./channel":3,"./utils":7}],5:[function(require,module,exports){
 (function (define) {
     "use strict";
 
@@ -2370,12 +2394,13 @@ Messaging = (function (global) {
 })(typeof define === 'function' && define.amd ? define : function (factory) {
     module.exports = factory(require);
 });
-},{"./utils":6}],5:[function(require,module,exports){
+},{"./utils":7}],6:[function(require,module,exports){
 (function (define) {
     "use strict";
 
     define(function (require) {
 
+        var debug = require('debug')('musher:socket');
         var utils = require('./utils');
         var Emitter = require('./emitter');
         var Channels = require('./channels');
@@ -2387,12 +2412,10 @@ Messaging = (function (global) {
                 return new Socket(adapter, opts);
             }
 
-            var self = this;
-
             // just save everything we get
             var settings = this.settings = utils.assign({ host: defaultHost }, opts);
             this.key = settings.key;
-            this.topicKey = this.key ? '$' + this.key + ':' : null;
+            this.prefix = this.key ? '$' + this.key + ':' : null;
 
             var useSSL = settings.ssl || settings.secure;
             if (useSSL !== null && useSSL !== undefined) {
@@ -2403,20 +2426,37 @@ Messaging = (function (global) {
             this.queue = [];
 
             // initialize adapter
-            adapter.initialize(self, utils);
+            adapter.initialize(this, utils);
 
             // we have an adapter now?
-            if (!self.adapter) {
+            if (!this.adapter) {
                 throw new Error('Adapter is not defined correctly: it should create `adapter` member of socket');
             }
 
-            self.channels = new Channels(this);
+            this.channels = new Channels(this);
+
+            var socket = this;
+            this.adapter.on('error', function () {
+                socket.emit('error')
+            });
+            this.adapter.on('connect', function () {
+                socket._connected();
+            });
+            this.adapter.on('close', function () {
+                socket._close();
+            });
+            this.adapter.on('message', function (topic, message, packet) {
+                socket._message(topic, message);
+            });
         }
 
         Emitter.extend(Socket);
 
+        Socket.prototype.__defineGetter__('connected', function () {
+            return this.adapter.connected;
+        });
+
         Socket.prototype._connected = function () {
-            this.connected = true;
             for (var i = 0; i < this.queue.length; i++) {
                 this.queue[i]();
             }
@@ -2424,9 +2464,8 @@ Messaging = (function (global) {
             this.emit('connected');
         };
 
-        Socket.prototype._disconnected = function () {
-            this.connected = false;
-            this.emit('disconnected');
+        Socket.prototype._close = function () {
+            this.emit('close');
         };
 
         Socket.prototype._enqueue = function (fn) {
@@ -2443,15 +2482,15 @@ Messaging = (function (global) {
         };
 
         Socket.prototype._encode = function (cname) {
-            return this.topicKey && cname.indexOf(this.topicKey) != 0 ? this.topicKey + cname : cname;
+            return this.prefix && cname.indexOf(this.prefix) !== 0 ? this.prefix + cname : cname;
         };
 
         Socket.prototype._decode = function (topic) {
-            return this.topicKey && topic.indexOf(this.topicKey) == 0 ? topic.substring(this.topicKey.length) : topic;
+            return this.prefix && topic.indexOf(this.prefix) === 0 ? topic.substring(this.prefix.length) : topic;
         };
 
         Socket.prototype.close = function (cb) {
-            if (cb) this.once('disconnected', cb);
+            if (cb) this.once('close', cb);
             this.adapter.close();
         };
 
@@ -2487,13 +2526,13 @@ Messaging = (function (global) {
         };
 
         Socket.prototype.publish = function (cname, event, data) {
-            var self = this;
-            if (!self.connected) {
+            var socket = this;
+            if (!socket.connected) {
                 this._enqueue(function () {
-                    self._publish(cname, event, data);
+                    socket._publish(cname, event, data);
                 });
             } else {
-                self._publish(cname, event, data);
+                socket._publish(cname, event, data);
             }
 
             return this;
@@ -2513,7 +2552,7 @@ Messaging = (function (global) {
 })(typeof define === 'function' && define.amd ? define : function (factory) {
     module.exports = factory(require);
 });
-},{"./channels":3,"./emitter":4,"./utils":6}],6:[function(require,module,exports){
+},{"./channels":4,"./emitter":5,"./utils":7,"debug":8}],7:[function(require,module,exports){
 (function (define) {
     "use strict";
 
@@ -2615,21 +2654,466 @@ Messaging = (function (global) {
 })(typeof define === 'function' && define.amd ? define : function (factory) {
     module.exports = factory(require);
 });
-},{}],7:[function(require,module,exports){
-var Socket = require('../lib/socket');
+},{}],8:[function(require,module,exports){
 
-exports.connect = function (key, settings) {
-    if (typeof key === 'object') {
-        settings = key;
-        key = null;
-    }
-    settings = settings || {};
-    if (key) settings.key = key;
-    return new Socket(require('../lib/adapters/paho'), settings);
+/**
+ * This is the web browser implementation of `debug()`.
+ *
+ * Expose `debug()` as the module.
+ */
+
+exports = module.exports = require('./debug');
+exports.log = log;
+exports.formatArgs = formatArgs;
+exports.save = save;
+exports.load = load;
+exports.useColors = useColors;
+
+/**
+ * Colors.
+ */
+
+exports.colors = [
+  'lightseagreen',
+  'forestgreen',
+  'goldenrod',
+  'dodgerblue',
+  'darkorchid',
+  'crimson'
+];
+
+/**
+ * Currently only WebKit-based Web Inspectors, Firefox >= v31,
+ * and the Firebug extension (any Firefox version) are known
+ * to support "%c" CSS customizations.
+ *
+ * TODO: add a `localStorage` variable to explicitly enable/disable colors
+ */
+
+function useColors() {
+  // is webkit? http://stackoverflow.com/a/16459606/376773
+  return ('WebkitAppearance' in document.documentElement.style) ||
+    // is firebug? http://stackoverflow.com/a/398120/376773
+    (window.console && (console.firebug || (console.exception && console.table))) ||
+    // is firefox >= v31?
+    // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+    (navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31);
+}
+
+/**
+ * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
+ */
+
+exports.formatters.j = function(v) {
+  return JSON.stringify(v);
 };
 
-exports.Socket = Socket;
-exports.utils = require('../lib/utils');
 
-},{"../lib/adapters/paho":1,"../lib/socket":5,"../lib/utils":6}]},{},[7])(7)
+/**
+ * Colorize log arguments if enabled.
+ *
+ * @api public
+ */
+
+function formatArgs() {
+  var args = arguments;
+  var useColors = this.useColors;
+
+  args[0] = (useColors ? '%c' : '')
+    + this.namespace
+    + (useColors ? ' %c' : ' ')
+    + args[0]
+    + (useColors ? '%c ' : ' ')
+    + '+' + exports.humanize(this.diff);
+
+  if (!useColors) return args;
+
+  var c = 'color: ' + this.color;
+  args = [args[0], c, 'color: inherit'].concat(Array.prototype.slice.call(args, 1));
+
+  // the final "%c" is somewhat tricky, because there could be other
+  // arguments passed either before or after the %c, so we need to
+  // figure out the correct index to insert the CSS into
+  var index = 0;
+  var lastC = 0;
+  args[0].replace(/%[a-z%]/g, function(match) {
+    if ('%%' === match) return;
+    index++;
+    if ('%c' === match) {
+      // we only are interested in the *last* %c
+      // (the user may have provided their own)
+      lastC = index;
+    }
+  });
+
+  args.splice(lastC, 0, c);
+  return args;
+}
+
+/**
+ * Invokes `console.log()` when available.
+ * No-op when `console.log` is not a "function".
+ *
+ * @api public
+ */
+
+function log() {
+  // This hackery is required for IE8,
+  // where the `console.log` function doesn't have 'apply'
+  return 'object' == typeof console
+    && 'function' == typeof console.log
+    && Function.prototype.apply.call(console.log, console, arguments);
+}
+
+/**
+ * Save `namespaces`.
+ *
+ * @param {String} namespaces
+ * @api private
+ */
+
+function save(namespaces) {
+  try {
+    if (null == namespaces) {
+      localStorage.removeItem('debug');
+    } else {
+      localStorage.debug = namespaces;
+    }
+  } catch(e) {}
+}
+
+/**
+ * Load `namespaces`.
+ *
+ * @return {String} returns the previously persisted debug modes
+ * @api private
+ */
+
+function load() {
+  var r;
+  try {
+    r = localStorage.debug;
+  } catch(e) {}
+  return r;
+}
+
+/**
+ * Enable namespaces listed in `localStorage.debug` initially.
+ */
+
+exports.enable(load());
+
+},{"./debug":9}],9:[function(require,module,exports){
+
+/**
+ * This is the common logic for both the Node.js and web browser
+ * implementations of `debug()`.
+ *
+ * Expose `debug()` as the module.
+ */
+
+exports = module.exports = debug;
+exports.coerce = coerce;
+exports.disable = disable;
+exports.enable = enable;
+exports.enabled = enabled;
+exports.humanize = require('ms');
+
+/**
+ * The currently active debug mode names, and names to skip.
+ */
+
+exports.names = [];
+exports.skips = [];
+
+/**
+ * Map of special "%n" handling functions, for the debug "format" argument.
+ *
+ * Valid key names are a single, lowercased letter, i.e. "n".
+ */
+
+exports.formatters = {};
+
+/**
+ * Previously assigned color.
+ */
+
+var prevColor = 0;
+
+/**
+ * Previous log timestamp.
+ */
+
+var prevTime;
+
+/**
+ * Select a color.
+ *
+ * @return {Number}
+ * @api private
+ */
+
+function selectColor() {
+  return exports.colors[prevColor++ % exports.colors.length];
+}
+
+/**
+ * Create a debugger with the given `namespace`.
+ *
+ * @param {String} namespace
+ * @return {Function}
+ * @api public
+ */
+
+function debug(namespace) {
+
+  // define the `disabled` version
+  function disabled() {
+  }
+  disabled.enabled = false;
+
+  // define the `enabled` version
+  function enabled() {
+
+    var self = enabled;
+
+    // set `diff` timestamp
+    var curr = +new Date();
+    var ms = curr - (prevTime || curr);
+    self.diff = ms;
+    self.prev = prevTime;
+    self.curr = curr;
+    prevTime = curr;
+
+    // add the `color` if not set
+    if (null == self.useColors) self.useColors = exports.useColors();
+    if (null == self.color && self.useColors) self.color = selectColor();
+
+    var args = Array.prototype.slice.call(arguments);
+
+    args[0] = exports.coerce(args[0]);
+
+    if ('string' !== typeof args[0]) {
+      // anything else let's inspect with %o
+      args = ['%o'].concat(args);
+    }
+
+    // apply any `formatters` transformations
+    var index = 0;
+    args[0] = args[0].replace(/%([a-z%])/g, function(match, format) {
+      // if we encounter an escaped % then don't increase the array index
+      if (match === '%%') return match;
+      index++;
+      var formatter = exports.formatters[format];
+      if ('function' === typeof formatter) {
+        var val = args[index];
+        match = formatter.call(self, val);
+
+        // now we need to remove `args[index]` since it's inlined in the `format`
+        args.splice(index, 1);
+        index--;
+      }
+      return match;
+    });
+
+    if ('function' === typeof exports.formatArgs) {
+      args = exports.formatArgs.apply(self, args);
+    }
+    var logFn = enabled.log || exports.log || console.log.bind(console);
+    logFn.apply(self, args);
+  }
+  enabled.enabled = true;
+
+  var fn = exports.enabled(namespace) ? enabled : disabled;
+
+  fn.namespace = namespace;
+
+  return fn;
+}
+
+/**
+ * Enables a debug mode by namespaces. This can include modes
+ * separated by a colon and wildcards.
+ *
+ * @param {String} namespaces
+ * @api public
+ */
+
+function enable(namespaces) {
+  exports.save(namespaces);
+
+  var split = (namespaces || '').split(/[\s,]+/);
+  var len = split.length;
+
+  for (var i = 0; i < len; i++) {
+    if (!split[i]) continue; // ignore empty strings
+    namespaces = split[i].replace(/\*/g, '.*?');
+    if (namespaces[0] === '-') {
+      exports.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
+    } else {
+      exports.names.push(new RegExp('^' + namespaces + '$'));
+    }
+  }
+}
+
+/**
+ * Disable debug output.
+ *
+ * @api public
+ */
+
+function disable() {
+  exports.enable('');
+}
+
+/**
+ * Returns true if the given mode name is enabled, false otherwise.
+ *
+ * @param {String} name
+ * @return {Boolean}
+ * @api public
+ */
+
+function enabled(name) {
+  var i, len;
+  for (i = 0, len = exports.skips.length; i < len; i++) {
+    if (exports.skips[i].test(name)) {
+      return false;
+    }
+  }
+  for (i = 0, len = exports.names.length; i < len; i++) {
+    if (exports.names[i].test(name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Coerce `val`.
+ *
+ * @param {Mixed} val
+ * @return {Mixed}
+ * @api private
+ */
+
+function coerce(val) {
+  if (val instanceof Error) return val.stack || val.message;
+  return val;
+}
+
+},{"ms":10}],10:[function(require,module,exports){
+/**
+ * Helpers.
+ */
+
+var s = 1000;
+var m = s * 60;
+var h = m * 60;
+var d = h * 24;
+var y = d * 365.25;
+
+/**
+ * Parse or format the given `val`.
+ *
+ * Options:
+ *
+ *  - `long` verbose formatting [false]
+ *
+ * @param {String|Number} val
+ * @param {Object} options
+ * @return {String|Number}
+ * @api public
+ */
+
+module.exports = function(val, options){
+  options = options || {};
+  if ('string' == typeof val) return parse(val);
+  return options.long
+    ? long(val)
+    : short(val);
+};
+
+/**
+ * Parse the given `str` and return milliseconds.
+ *
+ * @param {String} str
+ * @return {Number}
+ * @api private
+ */
+
+function parse(str) {
+  var match = /^((?:\d+)?\.?\d+) *(ms|seconds?|s|minutes?|m|hours?|h|days?|d|years?|y)?$/i.exec(str);
+  if (!match) return;
+  var n = parseFloat(match[1]);
+  var type = (match[2] || 'ms').toLowerCase();
+  switch (type) {
+    case 'years':
+    case 'year':
+    case 'y':
+      return n * y;
+    case 'days':
+    case 'day':
+    case 'd':
+      return n * d;
+    case 'hours':
+    case 'hour':
+    case 'h':
+      return n * h;
+    case 'minutes':
+    case 'minute':
+    case 'm':
+      return n * m;
+    case 'seconds':
+    case 'second':
+    case 's':
+      return n * s;
+    case 'ms':
+      return n;
+  }
+}
+
+/**
+ * Short format for `ms`.
+ *
+ * @param {Number} ms
+ * @return {String}
+ * @api private
+ */
+
+function short(ms) {
+  if (ms >= d) return Math.round(ms / d) + 'd';
+  if (ms >= h) return Math.round(ms / h) + 'h';
+  if (ms >= m) return Math.round(ms / m) + 'm';
+  if (ms >= s) return Math.round(ms / s) + 's';
+  return ms + 'ms';
+}
+
+/**
+ * Long format for `ms`.
+ *
+ * @param {Number} ms
+ * @return {String}
+ * @api private
+ */
+
+function long(ms) {
+  return plural(ms, d, 'day')
+    || plural(ms, h, 'hour')
+    || plural(ms, m, 'minute')
+    || plural(ms, s, 'second')
+    || ms + ' ms';
+}
+
+/**
+ * Pluralization helper.
+ */
+
+function plural(ms, n, name) {
+  if (ms < n) return;
+  if (ms < n * 1.5) return Math.floor(ms / n) + ' ' + name;
+  return Math.ceil(ms / n) + ' ' + name + 's';
+}
+
+},{}]},{},[1])(1)
 });

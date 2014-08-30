@@ -1,4 +1,4 @@
-var Socket = require('../lib/socket');
+var Socket = require('./lib/socket');
 
 exports.connect = function (key, settings) {
     if (typeof key === 'object') {
@@ -7,8 +7,8 @@ exports.connect = function (key, settings) {
     }
     settings = settings || {};
     if (key) settings.key = key;
-    return new Socket(require('../lib/adapters/paho'), settings);
+    return new Socket(require('./lib/adapters/paho'), settings);
 };
 
 exports.Socket = Socket;
-exports.utils = require('../lib/utils');
+exports.utils = require('./lib/utils');

@@ -72,7 +72,7 @@ module.exports = function (grunt) {
             },
             dist: {
                 files: {
-                    'build/<%= pkg.name %>.browserify.js': 'src/musher.browserify.js'
+                    'build/<%= pkg.name %>.browserify.js': 'browser.js'
                 }
             }
         },
@@ -126,6 +126,5 @@ module.exports = function (grunt) {
     grunt.loadNpmTasks('grunt-contrib-uglify');
 
     grunt.registerTask('build', ['browserify', 'concat', 'uglify', 'clean']);
-    grunt.registerTask('default', ['build', 'test-mocha']);
-    grunt.registerTask('all', ['build', 'test']);
+    grunt.registerTask('default', ['build', 'test']);
 };
