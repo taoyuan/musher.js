@@ -5,7 +5,7 @@
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-08-30 23:01
+* Date: 2014-08-30 23:08
 ***********************************************/
 // Only expose a single object name in the global namespace.
 // Everything must go through this module. Global Messaging module
@@ -2020,640 +2020,591 @@ exports.Socket = Socket;
 exports.utils = require('./lib/utils');
 
 },{"./lib/adapters/paho":2,"./lib/socket":6,"./lib/utils":7}],2:[function(require,module,exports){
-(function (define) {
-    "use strict";
+"use strict";
+var Emitter = require('../emitter');
 
-    define(function () {
+var defaultPort = 3883;
+var defaultSecurePort = 4883;
 
-        var Emitter = require('../emitter');
+/**
+ * http://git.eclipse.org/c/paho/org.eclipse.paho.mqtt.javascript.git/tree/src/mqttws31.js
+ */
 
-        var defaultPort = 3883;
-        var defaultSecurePort = 4883;
+exports.initialize = function initialize(socket, utils) {
+    var settings = socket.settings || {};
+    var opts = settings.options || {};
 
-        /**
-         * http://git.eclipse.org/c/paho/org.eclipse.paho.mqtt.javascript.git/tree/src/mqttws31.js
-         */
+    var clientId = settings.clientId || utils.makeId();
 
-        function initialize(socket, utils) {
-            var settings = socket.settings || {};
-            var opts = settings.options || {};
+    if (settings.key) opts.userName = settings.key;
+    if (settings.secret) opts.password = settings.secret;
 
-            var clientId = settings.clientId || utils.makeId();
+    if ('useSSL' in settings) {
+        opts.useSSL = settings.useSSL;
+    }
 
-            if (settings.key) opts.userName = settings.key;
-            if (settings.secret) opts.password = settings.secret;
+    settings.port = Number(settings.port || (opts.useSSL ? defaultSecurePort : defaultPort));
 
-            if ('useSSL' in settings) {
-                opts.useSSL = settings.useSSL;
-            }
+    var client = socket.client = new Messaging.Client(settings.host, settings.port, clientId);
+    socket.adapter = new Paho(client, opts);
+}
 
-            settings.port = Number(settings.port || (opts.useSSL ? defaultSecurePort: defaultPort));
+function Paho(client, opts) {
+    this.client = client;
 
-            var client = socket.client = new Messaging.Client(settings.host, settings.port, clientId);
-            socket.adapter = new Paho(client, opts);
-        }
+    var adapter = this;
+    client.onConnectionLost = function () {
+        adapter.emit('close');
+    };
+    client.onMessageArrived = function (message) {
+        adapter.emit('message', message.destinationName, message.payloadString);
+    };
 
-        function Paho(client, opts) {
-            this.client = client;
+    opts = opts || {};
+    opts.onSuccess = function onConnected() {
+        adapter.emit('connect');
+    };
 
-            var adapter = this;
-            client.onConnectionLost = function () {
-                adapter.emit('close');
-            };
-            client.onMessageArrived = function (message) {
-                adapter.emit('message', message.destinationName, message.payloadString);
-            };
+    client.connect(opts);
+}
 
-            opts = opts || {};
-            opts.onSuccess = function onConnected() {
-                adapter.emit('connect');
-            };
+Emitter.extend(Paho);
 
-            client.connect(opts);
-        }
-
-        Emitter.extend(Paho);
-
-        Paho.prototype.__defineGetter__('connected', function () {
-            return this.client.connected;
-        });
-
-        Paho.prototype.subscribe = function (topic, opts, cb) {
-            opts = opts || {};
-            if (cb) opts.onSuccess = cb;
-            return this.client.subscribe(topic, opts);
-        };
-
-        Paho.prototype.unsubscribe = function (topic, opts, cb) {
-            opts = opts || {};
-            if (cb) opts.onSuccess = cb;
-            return this.client.unsubscribe(topic, opts);
-        };
-
-        Paho.prototype.publish = function (topic, message) {
-            var m = new Messaging.Message(message);
-            m.destinationName = topic;
-            return this.client.send(m);
-        };
-
-        Paho.prototype.close = function () {
-            return this.client.disconnect();
-        };
-
-        return {
-            initialize: initialize
-        };
-    });
-
-})(typeof define === 'function' && define.amd ? define : function (factory) {
-    module.exports = factory(require);
+Paho.prototype.__defineGetter__('connected', function () {
+    return this.client.connected;
 });
+
+Paho.prototype.subscribe = function (topic, opts, cb) {
+    opts = opts || {};
+    if (cb) opts.onSuccess = cb;
+    return this.client.subscribe(topic, opts);
+};
+
+Paho.prototype.unsubscribe = function (topic, opts, cb) {
+    opts = opts || {};
+    if (cb) opts.onSuccess = cb;
+    return this.client.unsubscribe(topic, opts);
+};
+
+Paho.prototype.publish = function (topic, message) {
+    var m = new Messaging.Message(message);
+    m.destinationName = topic;
+    return this.client.send(m);
+};
+
+Paho.prototype.close = function () {
+    return this.client.disconnect();
+};
+
 },{"../emitter":5}],3:[function(require,module,exports){
-(function (define) {
-    "use strict";
+"use strict";
 
-    define(function (require) {
+var Emitter = require('./emitter');
 
-        var Emitter = require('./emitter');
+module.exports = Channel;
 
-        function Channel(name, options, socket) {
-            if (!(this instanceof Channel)) {
-                return new Channel(name, options, socket);
-            }
-            this.socket = socket;
-            this.key = socket.key;
-            this.adapter = socket.adapter;
-            this.name = name;//.replace(/\$/, "\\$");
-            this.options = options;
-            this.topic = socket._encode(this.name);
-        }
+function Channel(name, options, socket) {
+    if (!(this instanceof Channel)) {
+        return new Channel(name, options, socket);
+    }
+    this.socket = socket;
+    this.key = socket.key;
+    this.adapter = socket.adapter;
+    this.name = name;//.replace(/\$/, "\\$");
+    this.options = options;
+    this.topic = socket._encode(this.name);
+}
 
-        Emitter.extend(Channel);
+Emitter.extend(Channel);
 
-        Channel.prototype.bind = Channel.prototype.on;
+Channel.prototype.bind = Channel.prototype.on;
 
-        Channel.prototype.subscribe = function (cb) {
-            var self = this;
-            this.adapter.subscribe(this.topic, this.options, function (err) {
-                if (cb) cb.call(self, err, self);
-            });
-            return this;
-        };
-
-        /**
-         * unsubscribe - unsubscribe from channel
-         *
-         * @param {Function} [cb] - callback fired on unsuback
-         * @returns {Channel} this - for chaining
-         * @example channel.unsubscribe('topic');
-         * @example channel.unsubscribe('topic', console.log);
-         */
-        Channel.prototype.unsubscribe = function (cb) {
-            this.adapter.unsubscribe(this.topic, {}, cb);
-            return this;
-        };
-
-        Channel.prototype.__handleMessage = function (message) {
-            message = JSON.parse(message);
-            if (message.__event__ && message.__data__) {
-                this.emit(message.__event__, message.__data__);
-            }
-        };
-
-        /**
-         * Convenience method for publish through channel.
-         *
-         * @param event
-         * @param data
-         */
-        Channel.prototype.publish = function (event, data) {
-            this.socket.publish(this.name, event, data);
-        };
-
-        return Channel;
+Channel.prototype.subscribe = function (cb) {
+    var self = this;
+    this.adapter.subscribe(this.topic, this.options, function (err) {
+        if (cb) cb.call(self, err, self);
     });
-})(typeof define === 'function' && define.amd ? define : function (factory) {
-    module.exports = factory(require);
-});
+    return this;
+};
+
+/**
+ * unsubscribe - unsubscribe from channel
+ *
+ * @param {Function} [cb] - callback fired on unsuback
+ * @returns {Channel} this - for chaining
+ * @example channel.unsubscribe('topic');
+ * @example channel.unsubscribe('topic', console.log);
+ */
+Channel.prototype.unsubscribe = function (cb) {
+    this.adapter.unsubscribe(this.topic, {}, cb);
+    return this;
+};
+
+Channel.prototype.__handleMessage = function (message) {
+    message = JSON.parse(message);
+    if (message.__event__ && message.__data__) {
+        this.emit(message.__event__, message.__data__);
+    }
+};
+
+/**
+ * Convenience method for publish through channel.
+ *
+ * @param event
+ * @param data
+ */
+Channel.prototype.publish = function (event, data) {
+    this.socket.publish(this.name, event, data);
+};
+
 },{"./emitter":5}],4:[function(require,module,exports){
-(function (define) {
-    "use strict";
+"use strict";
 
-    define(function (require) {
+var Channel = require('./channel');
+var utils = require('./utils');
 
-        var Channel = require('./channel');
-        var utils = require('./utils');
+module.exports = Channels;
 
-        function Channels(socket) {
-            this.socket = socket;
-            this.key = socket.key;
-            this.adapter = socket.adapter;
-            this._channels = {};
-        }
+function Channels(socket) {
+    this.socket = socket;
+    this.key = socket.key;
+    this.adapter = socket.adapter;
+    this._channels = {};
+}
 
-        Channels.prototype.add = function (cname, options, socket) {
-            return utils.sure(this._channels, cname, function () {
-                return createChannel(cname, options, socket);
-            });
-        };
-
-        Channels.prototype.remove = function (cname) {
-            var channel = this._channels[cname];
-            delete this._channels[cname];
-            return channel;
-        };
-
-        Channels.prototype.channel = function (cnameOrTopic) {
-            return this._channels[this.socket._decode(cnameOrTopic)];
-        };
-
-        Channels.prototype.unsubscribeAll = function (cb) {
-            if (!this.channels) return cb();
-            var invokers = [];
-            utils.each(this.channels, function (channel) {
-                invokers.push(channel.unsubscribe.bind(channel));
-            });
-            return utils.parallel(invokers, cb);
-        };
-
-        function createChannel(name, options, socket) {
-            return new Channel(name, options, socket);
-        }
-
-        return Channels;
+Channels.prototype.add = function (cname, options, socket) {
+    return utils.sure(this._channels, cname, function () {
+        return createChannel(cname, options, socket);
     });
-})(typeof define === 'function' && define.amd ? define : function (factory) {
-    module.exports = factory(require);
-});
+};
+
+Channels.prototype.remove = function (cname) {
+    var channel = this._channels[cname];
+    delete this._channels[cname];
+    return channel;
+};
+
+Channels.prototype.channel = function (cnameOrTopic) {
+    return this._channels[this.socket._decode(cnameOrTopic)];
+};
+
+Channels.prototype.unsubscribeAll = function (cb) {
+    if (!this.channels) return cb();
+    var invokers = [];
+    utils.each(this.channels, function (channel) {
+        invokers.push(channel.unsubscribe.bind(channel));
+    });
+    return utils.parallel(invokers, cb);
+};
+
+function createChannel(name, options, socket) {
+    return new Channel(name, options, socket);
+}
 },{"./channel":3,"./utils":7}],5:[function(require,module,exports){
-(function (define) {
-    "use strict";
+"use strict";
 
-    define(function (require) {
+var utils = require('./utils');
 
-        var utils = require('./utils');
+module.exports = Emitter;
 
-        function Emitter() {
-        }
+function Emitter() {
+}
 
-        /**
-         * Mixin the emitter properties.
-         *
-         * @param {Object} obj
-         * @return {Object}
-         * @api private
-         */
+/**
+ * Mixin the emitter properties.
+ *
+ * @param {Object} obj
+ * @return {Object}
+ * @api private
+ */
 
-        Emitter.mixin = function(obj) {
-            utils.assign(obj, Emitter.prototype);
-            return obj;
-        };
+Emitter.mixin = function (obj) {
+    utils.assign(obj, Emitter.prototype);
+    return obj;
+};
 
-        Emitter.extend = function(obj) {
-            utils.assign(obj.prototype, Emitter.prototype);
-            return obj;
-        };
+Emitter.extend = function (obj) {
+    utils.assign(obj.prototype, Emitter.prototype);
+    return obj;
+};
 
-        /**
-         * Listen on the given `event` with `fn`.
-         *
-         * @param {String} event
-         * @param {Function} fn
-         * @return {Emitter}
-         * @api public
-         */
+/**
+ * Listen on the given `event` with `fn`.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
 
-        Emitter.prototype.on =
-            Emitter.prototype.addEventListener = function (event, fn) {
+Emitter.prototype.on =
+    Emitter.prototype.addEventListener = function (event, fn) {
+        this._callbacks = this._callbacks || {};
+        (this._callbacks[event] = this._callbacks[event] || [])
+            .push(fn);
+        return this;
+    };
+
+/**
+ * Adds an `event` listener that will be invoked a single
+ * time then automatically removed.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.once = function (event, fn) {
+    var self = this;
+    this._callbacks = this._callbacks || {};
+
+    function on() {
+        self.off(event, on);
+        fn.apply(this, arguments);
+    }
+
+    on.fn = fn;
+    this.on(event, on);
+    return this;
+};
+
+/**
+ * Remove the given callback for `event` or all
+ * registered callbacks.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.off =
+    Emitter.prototype.removeListener =
+        Emitter.prototype.removeAllListeners =
+            Emitter.prototype.removeEventListener = function (event, fn) {
                 this._callbacks = this._callbacks || {};
-                (this._callbacks[event] = this._callbacks[event] || [])
-                    .push(fn);
+
+                // all
+                if (0 == arguments.length) {
+                    this._callbacks = {};
+                    return this;
+                }
+
+                // specific event
+                var callbacks = this._callbacks[event];
+                if (!callbacks) return this;
+
+                // remove all handlers
+                if (1 == arguments.length) {
+                    delete this._callbacks[event];
+                    return this;
+                }
+
+                // remove specific handler
+                var cb;
+                for (var i = 0; i < callbacks.length; i++) {
+                    cb = callbacks[i];
+                    if (cb === fn || cb.fn === fn) {
+                        callbacks.splice(i, 1);
+                        break;
+                    }
+                }
                 return this;
             };
 
-        /**
-         * Adds an `event` listener that will be invoked a single
-         * time then automatically removed.
-         *
-         * @param {String} event
-         * @param {Function} fn
-         * @return {Emitter}
-         * @api public
-         */
+/**
+ * Emit `event` with the given args.
+ *
+ * @param {String} event
+ * @param {Mixed} ...
+ * @return {Emitter}
+ */
 
-        Emitter.prototype.once = function (event, fn) {
-            var self = this;
-            this._callbacks = this._callbacks || {};
+Emitter.prototype.emit = function (event) {
+    this._callbacks = this._callbacks || {};
+    var args = [].slice.call(arguments, 1)
+        , callbacks = this._callbacks[event];
 
-            function on() {
-                self.off(event, on);
-                fn.apply(this, arguments);
-            }
+    if (callbacks) {
+        callbacks = callbacks.slice(0);
+        for (var i = 0, len = callbacks.length; i < len; ++i) {
+            callbacks[i].apply(this, args);
+        }
+    }
 
-            on.fn = fn;
-            this.on(event, on);
-            return this;
-        };
+    return this;
+};
 
-        /**
-         * Remove the given callback for `event` or all
-         * registered callbacks.
-         *
-         * @param {String} event
-         * @param {Function} fn
-         * @return {Emitter}
-         * @api public
-         */
+/**
+ * Return array of callbacks for `event`.
+ *
+ * @param {String} event
+ * @return {Array}
+ * @api public
+ */
 
-        Emitter.prototype.off =
-            Emitter.prototype.removeListener =
-                Emitter.prototype.removeAllListeners =
-                    Emitter.prototype.removeEventListener = function (event, fn) {
-                        this._callbacks = this._callbacks || {};
+Emitter.prototype.listeners = function (event) {
+    this._callbacks = this._callbacks || {};
+    return this._callbacks[event] || [];
+};
 
-                        // all
-                        if (0 == arguments.length) {
-                            this._callbacks = {};
-                            return this;
-                        }
+/**
+ * Check if this emitter has `event` handlers.
+ *
+ * @param {String} event
+ * @return {Boolean}
+ * @api public
+ */
 
-                        // specific event
-                        var callbacks = this._callbacks[event];
-                        if (!callbacks) return this;
+Emitter.prototype.hasListeners = function (event) {
+    return !!this.listeners(event).length;
+};
 
-                        // remove all handlers
-                        if (1 == arguments.length) {
-                            delete this._callbacks[event];
-                            return this;
-                        }
-
-                        // remove specific handler
-                        var cb;
-                        for (var i = 0; i < callbacks.length; i++) {
-                            cb = callbacks[i];
-                            if (cb === fn || cb.fn === fn) {
-                                callbacks.splice(i, 1);
-                                break;
-                            }
-                        }
-                        return this;
-                    };
-
-        /**
-         * Emit `event` with the given args.
-         *
-         * @param {String} event
-         * @param {Mixed} ...
-         * @return {Emitter}
-         */
-
-        Emitter.prototype.emit = function (event) {
-            this._callbacks = this._callbacks || {};
-            var args = [].slice.call(arguments, 1)
-                , callbacks = this._callbacks[event];
-
-            if (callbacks) {
-                callbacks = callbacks.slice(0);
-                for (var i = 0, len = callbacks.length; i < len; ++i) {
-                    callbacks[i].apply(this, args);
-                }
-            }
-
-            return this;
-        };
-
-        /**
-         * Return array of callbacks for `event`.
-         *
-         * @param {String} event
-         * @return {Array}
-         * @api public
-         */
-
-        Emitter.prototype.listeners = function (event) {
-            this._callbacks = this._callbacks || {};
-            return this._callbacks[event] || [];
-        };
-
-        /**
-         * Check if this emitter has `event` handlers.
-         *
-         * @param {String} event
-         * @return {Boolean}
-         * @api public
-         */
-
-        Emitter.prototype.hasListeners = function (event) {
-            return !!this.listeners(event).length;
-        };
-
-        return Emitter;
-
-    });
-
-})(typeof define === 'function' && define.amd ? define : function (factory) {
-    module.exports = factory(require);
-});
 },{"./utils":7}],6:[function(require,module,exports){
-(function (define) {
-    "use strict";
+"use strict";
+var debug = require('debug')('musher:socket');
+var utils = require('./utils');
+var Emitter = require('./emitter');
+var Channels = require('./channels');
 
-    define(function (require) {
+var defaultHost = 'musher.io';
 
-        var debug = require('debug')('musher:socket');
-        var utils = require('./utils');
-        var Emitter = require('./emitter');
-        var Channels = require('./channels');
+module.exports = Socket;
 
-        var defaultHost = 'musher.io';
+function Socket(adapter, opts) {
+    if (!(this instanceof Socket)) {
+        return new Socket(adapter, opts);
+    }
 
-        function Socket(adapter, opts) {
-            if (!(this instanceof Socket)) {
-                return new Socket(adapter, opts);
-            }
+    // just save everything we get
+    var settings = this.settings = utils.assign({ host: defaultHost }, opts);
+    this.key = settings.key;
+    this.prefix = this.key ? '$' + this.key + ':' : null;
 
-            // just save everything we get
-            var settings = this.settings = utils.assign({ host: defaultHost }, opts);
-            this.key = settings.key;
-            this.prefix = this.key ? '$' + this.key + ':' : null;
+    var useSSL = settings.ssl || settings.secure;
+    if (useSSL !== null && useSSL !== undefined) {
+        settings.useSSL = !!useSSL;
+    }
+    settings.options = settings.options || {};
 
-            var useSSL = settings.ssl || settings.secure;
-            if (useSSL !== null && useSSL !== undefined) {
-                settings.useSSL = !!useSSL;
-            }
-            settings.options = settings.options || {};
+    this.queue = [];
 
-            this.queue = [];
+    // initialize adapter
+    adapter.initialize(this, utils);
 
-            // initialize adapter
-            adapter.initialize(this, utils);
+    // we have an adapter now?
+    if (!this.adapter) {
+        throw new Error('Adapter is not defined correctly: it should create `adapter` member of socket');
+    }
 
-            // we have an adapter now?
-            if (!this.adapter) {
-                throw new Error('Adapter is not defined correctly: it should create `adapter` member of socket');
-            }
+    this.channels = new Channels(this);
 
-            this.channels = new Channels(this);
+    var socket = this;
+    this.adapter.on('error', function () {
+        socket.emit('error')
+    });
+    this.adapter.on('connect', function () {
+        socket._connected();
+    });
+    this.adapter.on('close', function () {
+        socket._close();
+    });
+    this.adapter.on('message', function (topic, message, packet) {
+        socket._message(topic, message);
+    });
+}
 
-            var socket = this;
-            this.adapter.on('error', function () {
-                socket.emit('error')
-            });
-            this.adapter.on('connect', function () {
-                socket._connected();
-            });
-            this.adapter.on('close', function () {
-                socket._close();
-            });
-            this.adapter.on('message', function (topic, message, packet) {
-                socket._message(topic, message);
-            });
-        }
+Emitter.extend(Socket);
 
-        Emitter.extend(Socket);
+Socket.prototype.__defineGetter__('connected', function () {
+    return this.adapter.connected;
+});
 
-        Socket.prototype.__defineGetter__('connected', function () {
-            return this.adapter.connected;
+Socket.prototype._connected = function () {
+    for (var i = 0; i < this.queue.length; i++) {
+        this.queue[i]();
+    }
+    this.queue = [];
+    this.emit('connected');
+};
+
+Socket.prototype._close = function () {
+    this.emit('close');
+};
+
+Socket.prototype._enqueue = function (fn) {
+    this.queue.push(fn);
+};
+
+Socket.prototype._message = function (topic, message) {
+    var c = this.channel(topic);
+    if (c) {
+        c.__handleMessage(message);
+    } else {
+        throw new Error('No channel to handle message with topic [' + topic + ']');
+    }
+};
+
+Socket.prototype._encode = function (cname) {
+    return this.prefix && cname.indexOf(this.prefix) !== 0 ? this.prefix + cname : cname;
+};
+
+Socket.prototype._decode = function (topic) {
+    return this.prefix && topic.indexOf(this.prefix) === 0 ? topic.substring(this.prefix.length) : topic;
+};
+
+Socket.prototype.close = function (cb) {
+    if (cb) this.once('close', cb);
+    this.adapter.close();
+};
+
+Socket.prototype.channel = function (nameOrTopic) {
+    return this.channels.channel(nameOrTopic);
+};
+
+Socket.prototype.subscribe = function (cname, options, cb) {
+    if (typeof options === "function") {
+        cb = options;
+        options = null;
+    }
+    var channel = this.channels.add(cname, options, this);
+    if (this.connected) {
+        channel.subscribe(cb);
+    } else {
+        this._enqueue(function () {
+            channel.subscribe(cb);
         });
+    }
+    return channel;
+};
 
-        Socket.prototype._connected = function () {
-            for (var i = 0; i < this.queue.length; i++) {
-                this.queue[i]();
-            }
-            this.queue = [];
-            this.emit('connected');
-        };
+Socket.prototype.unsubscribe = function (cname, cb) {
+    cb = cb || utils.nop;
+    var channel = this.channels.remove(cname, cb);
+    if (channel.connected) {
+        channel.unsubscribe(cb);
+    } else {
+        cb();
+    }
+    return this;
+};
 
-        Socket.prototype._close = function () {
-            this.emit('close');
-        };
+Socket.prototype.publish = function (cname, event, data) {
+    var socket = this;
+    if (!socket.connected) {
+        this._enqueue(function () {
+            socket._publish(cname, event, data);
+        });
+    } else {
+        socket._publish(cname, event, data);
+    }
 
-        Socket.prototype._enqueue = function (fn) {
-            this.queue.push(fn);
-        };
+    return this;
+};
 
-        Socket.prototype._message = function (topic, message) {
-            var c = this.channel(topic);
-            if (c) {
-                c.__handleMessage(message);
-            } else {
-                throw new Error('No channel to handle message with topic [' + topic + ']');
-            }
-        };
+Socket.prototype._publish = function (cname, event, data) {
+    var message = JSON.stringify({__event__: event, __data__: data});
+    this.adapter.publish(this._encode(cname), message);
+};
 
-        Socket.prototype._encode = function (cname) {
-            return this.prefix && cname.indexOf(this.prefix) !== 0 ? this.prefix + cname : cname;
-        };
+Socket.defaults = function (settings) {
+    utils.assign(defaults, settings);
+};
 
-        Socket.prototype._decode = function (topic) {
-            return this.prefix && topic.indexOf(this.prefix) === 0 ? topic.substring(this.prefix.length) : topic;
-        };
-
-        Socket.prototype.close = function (cb) {
-            if (cb) this.once('close', cb);
-            this.adapter.close();
-        };
-
-        Socket.prototype.channel = function (nameOrTopic) {
-            return this.channels.channel(nameOrTopic);
-        };
-
-        Socket.prototype.subscribe = function (cname, options, cb) {
-            if (typeof options === "function") {
-                cb = options;
-                options = null;
-            }
-            var channel = this.channels.add(cname, options, this);
-            if (this.connected) {
-                channel.subscribe(cb);
-            } else {
-                this._enqueue(function () {
-                    channel.subscribe(cb);
-                });
-            }
-            return channel;
-        };
-
-        Socket.prototype.unsubscribe = function (cname, cb) {
-            cb = cb || utils.nop;
-            var channel = this.channels.remove(cname, cb);
-            if (channel.connected) {
-                channel.unsubscribe(cb);
-            } else {
-                cb();
-            }
-            return this;
-        };
-
-        Socket.prototype.publish = function (cname, event, data) {
-            var socket = this;
-            if (!socket.connected) {
-                this._enqueue(function () {
-                    socket._publish(cname, event, data);
-                });
-            } else {
-                socket._publish(cname, event, data);
-            }
-
-            return this;
-        };
-
-        Socket.prototype._publish = function (cname, event, data) {
-            var message = JSON.stringify({__event__: event, __data__: data});
-            this.adapter.publish(this._encode(cname), message);
-        };
-
-        Socket.defaults = function (settings) {
-            utils.assign(defaults, settings);
-        };
-
-        return Socket;
-    });
-})(typeof define === 'function' && define.amd ? define : function (factory) {
-    module.exports = factory(require);
-});
 },{"./channels":4,"./emitter":5,"./utils":7,"debug":8}],7:[function(require,module,exports){
-(function (define) {
-    "use strict";
+"use strict";
 
-    define(function () {
+var breaker = {};
 
-        var breaker = {};
+var ArrayProto = Array.prototype;
 
-        var ArrayProto = Array.prototype;
+var nativeForEach = ArrayProto.forEach;
+var slice = ArrayProto.slice;
 
-        var nativeForEach = ArrayProto.forEach;
-        var slice = ArrayProto.slice;
+exports = module.exports = {
+    nop: nop,
+    each: forEach,
+    forEach: forEach,
+    assign: assign,
+    parallel: parallel,
+    sure: sure,
+    makeId: makeId,
+    parseAuthOptions: parseAuthOptions
+};
 
-        return {
-            nop: nop,
-            each: forEach,
-            forEach: forEach,
-            assign: assign,
-            parallel: parallel,
-            sure: sure,
-            makeId: makeId,
-            parseAuthOptions: parseAuthOptions
-        };
+function nop() {
+}
 
-        function nop() {
+function forEach(obj, iterator, context) {
+    if (obj == null) return;
+    if (nativeForEach && obj.forEach === nativeForEach) {
+        obj.forEach(iterator, context);
+    } else if (obj.length === +obj.length) {
+        for (var i = 0, length = obj.length; i < length; i++) {
+            if (iterator.call(context, obj[i], i, obj) === breaker) return;
         }
+    } else {
+        var keys = obj.keys;
+        for (var i = 0, length = keys.length; i < length; i++) {
+            if (iterator.call(context, obj[keys[i]], keys[i], obj) === breaker) return;
+        }
+    }
+}
 
-        function forEach(obj, iterator, context) {
-            if (obj == null) return;
-            if (nativeForEach && obj.forEach === nativeForEach) {
-                obj.forEach(iterator, context);
-            } else if (obj.length === +obj.length) {
-                for (var i = 0, length = obj.length; i < length; i++) {
-                    if (iterator.call(context, obj[i], i, obj) === breaker) return;
-                }
-            } else {
-                var keys = obj.keys;
-                for (var i = 0, length = keys.length; i < length; i++) {
-                    if (iterator.call(context, obj[keys[i]], keys[i], obj) === breaker) return;
-                }
+
+function assign(obj) {
+    forEach(slice.call(arguments, 1), function (source) {
+        if (source) {
+            for (var prop in source) {
+                obj[prop] = source[prop];
             }
         }
-
-
-        function assign(obj) {
-            forEach(slice.call(arguments, 1), function (source) {
-                if (source) {
-                    for (var prop in source) {
-                        obj[prop] = source[prop];
-                    }
-                }
-            });
-            return obj;
-        }
-
-        function parallel(tasks, callback) {
-            var results = [], count = tasks.length;
-            tasks.forEach(function (task, index) {
-                task(function (err, data) {
-                    results[index] = data;
-                    if (err) {
-                        callback(err);
-                        callback = null;
-                    }
-                    if (--count === 0 && callback) {
-                        callback(null, results);
-                    }
-                });
-            });
-        }
-
-        function sure(obj, key, value) {
-            var v = obj[key];
-            return v ? v : obj[key] = (typeof value === 'function' ? value.call(obj) : value);
-        }
-
-        function makeId(prefix) {
-            var i, possible, text;
-            text = "";
-            possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-            for (i = 0; i < 5; i++) {
-                text += possible.charAt(Math.floor(Math.random() * possible.length));
-            }
-            return (prefix ? prefix :'musher-') + text;
-        }
-
-        function parseAuthOptions(auth, opts) {
-            if(auth){
-                if (auth.key) {
-                    opts.username = auth.key;
-                }
-                if (auth.secret) {
-                    opts.password = auth.secret;
-                }
-            }
-        }
-
     });
+    return obj;
+}
 
-})(typeof define === 'function' && define.amd ? define : function (factory) {
-    module.exports = factory(require);
-});
+function parallel(tasks, callback) {
+    var results = [], count = tasks.length;
+    tasks.forEach(function (task, index) {
+        task(function (err, data) {
+            results[index] = data;
+            if (err) {
+                callback(err);
+                callback = null;
+            }
+            if (--count === 0 && callback) {
+                callback(null, results);
+            }
+        });
+    });
+}
+
+function sure(obj, key, value) {
+    var v = obj[key];
+    return v ? v : obj[key] = (typeof value === 'function' ? value.call(obj) : value);
+}
+
+function makeId(prefix) {
+    var i, possible, text;
+    text = "";
+    possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    for (i = 0; i < 5; i++) {
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return (prefix ? prefix : 'musher-') + text;
+}
+
+function parseAuthOptions(auth, opts) {
+    if (auth) {
+        if (auth.key) {
+            opts.username = auth.key;
+        }
+        if (auth.secret) {
+            opts.password = auth.secret;
+        }
+    }
+}
 },{}],8:[function(require,module,exports){
 
 /**
