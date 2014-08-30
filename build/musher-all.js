@@ -5,7 +5,7 @@
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-08-30 17:43
+* Date: 2014-08-30 17:53
 ***********************************************/
 // Only expose a single object name in the global namespace.
 // Everything must go through this module. Global Messaging module

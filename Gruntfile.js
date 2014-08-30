@@ -126,7 +126,6 @@ module.exports = function (grunt) {
     grunt.loadNpmTasks('grunt-contrib-uglify');
 
     grunt.registerTask('build', ['browserify', 'concat', 'uglify', 'clean']);
-
-    grunt.registerTask('default', ['build', 'test']);
-
+    grunt.registerTask('default', ['build', 'test-mocha']);
+    grunt.registerTask('all', ['build', 'test']);
 };
