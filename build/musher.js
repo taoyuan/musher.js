@@ -1,11 +1,11 @@
 /***********************************************
-* Musher Javascript and Node.js Library v0.1.0
+* Musher Javascript and Node.js Library v0.1.2
 * https://github.com/taoyuan/musher
 * 
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-09-01 11:18
+* Date: 2014-09-01 15:16
 ***********************************************/
 !function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.musher=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var Socket = require('./lib/socket');
@@ -146,11 +146,11 @@ Channel.prototype.unsubscribe = function (cb) {
     return this;
 };
 
-Channel.prototype._handleMessage = function (message) {
+Channel.prototype._handleMessage = function (message, route) {
     message = JSON.parse(message);
-    if (message.__event__ && message.__data__) {
-        this.emit(message.__event__, message.__data__);
-    }
+    var event = message.__event__ || route.params.event || 'message';
+    var data = message.__data__ || message;
+    this.emit(event, data, route);
 };
 
 /**
@@ -221,8 +221,15 @@ Channels.prototype._handleMessage = function (topic, message) {
     topic = this.socket._unwrap(topic);
     var matched = this.router.match(topic);
     if (!matched) throw new Error('No channel to handle message with topic [' + topic + ']');
+    var channel;
     while (matched) {
-        matched.data._handleMessage(message);
+        channel = matched.data;
+        channel._handleMessage(message, {
+            params: matched.params,
+            splats: matched.splats,
+            path: matched.src,
+            topic: topic
+        });
         matched = matched.next();
     }
 };
@@ -689,6 +696,10 @@ Socket.prototype.publish = function (topic, event, data) {
 };
 
 Socket.prototype._publish = function (topic, event, data) {
+    if (!topic) throw new Error('`topic` must not be null');
+    if (!event) throw new Error('`event` must not be null');
+    if (!data) throw new Error('`data` must not be null');
+
     var message = JSON.stringify({__event__: event, __data__: data});
     this.adapter.publish(this._wrap(topic), message);
 };

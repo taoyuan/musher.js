@@ -1,11 +1,11 @@
 /***********************************************
-* Musher Javascript and Node.js Library v0.1.0
+* Musher Javascript and Node.js Library v0.1.2
 * https://github.com/taoyuan/musher
 * 
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-09-01 11:18
+* Date: 2014-09-01 15:16
 ***********************************************/
 // Only expose a single object name in the global namespace.
 // Everything must go through this module. Global Messaging module
@@ -2142,11 +2142,11 @@ Channel.prototype.unsubscribe = function (cb) {
     return this;
 };
 
-Channel.prototype._handleMessage = function (message) {
+Channel.prototype._handleMessage = function (message, route) {
     message = JSON.parse(message);
-    if (message.__event__ && message.__data__) {
-        this.emit(message.__event__, message.__data__);
-    }
+    var event = message.__event__ || route.params.event || 'message';
+    var data = message.__data__ || message;
+    this.emit(event, data, route);
 };
 
 /**
@@ -2217,8 +2217,15 @@ Channels.prototype._handleMessage = function (topic, message) {
     topic = this.socket._unwrap(topic);
     var matched = this.router.match(topic);
     if (!matched) throw new Error('No channel to handle message with topic [' + topic + ']');
+    var channel;
     while (matched) {
-        matched.data._handleMessage(message);
+        channel = matched.data;
+        channel._handleMessage(message, {
+            params: matched.params,
+            splats: matched.splats,
+            path: matched.src,
+            topic: topic
+        });
         matched = matched.next();
     }
 };
@@ -2685,6 +2692,10 @@ Socket.prototype.publish = function (topic, event, data) {
 };
 
 Socket.prototype._publish = function (topic, event, data) {
+    if (!topic) throw new Error('`topic` must not be null');
+    if (!event) throw new Error('`event` must not be null');
+    if (!data) throw new Error('`data` must not be null');
+
     var message = JSON.stringify({__event__: event, __data__: data});
     this.adapter.publish(this._wrap(topic), message);
 };
