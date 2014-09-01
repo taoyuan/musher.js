@@ -99,6 +99,17 @@ describe('socket', function () {
             });
             socket.publish('foo/bar', 'data', data);
         });
+
+        it('should work with params', function (done) {
+            var data = {boo: 'foo'};
+            var channel = socket.subscribe('foo/:bar');
+            channel.on('data', function (message, route) {
+                t.deepEqual(data, message);
+                t.equal(route.params.bar, 'bar');
+                done();
+            });
+            socket.publish('foo/bar', 'data', data);
+        });
     });
 
     describe('without key', function () {
