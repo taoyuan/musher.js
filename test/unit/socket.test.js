@@ -90,15 +90,15 @@ describe('socket', function () {
             socket.publish('$tom', 'data', data);
         });
 
-//        it('should work with char +', function (done) {
-//            var data = {boo: 'foo'};
-//            var channel = socket.subscribe('foo/+');
-//            channel.on('data', function (message) {
-//                t.deepEqual(data, message);
-//                done();
-//            });
-//            socket.publish('foo/bar', 'data', data);
-//        })
+        it('should work with char wild char', function (done) {
+            var data = {boo: 'foo'};
+            var channel = socket.subscribe('foo/*');
+            channel.on('data', function (message) {
+                t.deepEqual(data, message);
+                done();
+            });
+            socket.publish('foo/bar', 'data', data);
+        });
     });
 
     describe('without key', function () {

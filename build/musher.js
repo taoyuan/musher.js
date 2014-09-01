@@ -5,7 +5,7 @@
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-08-30 23:08
+* Date: 2014-09-01 11:18
 ***********************************************/
 !function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.musher=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var Socket = require('./lib/socket');
@@ -23,7 +23,7 @@ exports.connect = function (key, settings) {
 exports.Socket = Socket;
 exports.utils = require('./lib/utils');
 
-},{"./lib/adapters/paho":2,"./lib/socket":6,"./lib/utils":7}],2:[function(require,module,exports){
+},{"./lib/adapters/paho":2,"./lib/socket":7,"./lib/utils":8}],2:[function(require,module,exports){
 "use strict";
 var Emitter = require('../emitter');
 
@@ -107,25 +107,27 @@ var Emitter = require('./emitter');
 
 module.exports = Channel;
 
-function Channel(name, options, socket) {
+function Channel(name, socket) {
     if (!(this instanceof Channel)) {
-        return new Channel(name, options, socket);
+        return new Channel(name, socket);
     }
     this.socket = socket;
-    this.key = socket.key;
     this.adapter = socket.adapter;
-    this.name = name;//.replace(/\$/, "\\$");
-    this.options = options;
-    this.topic = socket._encode(this.name);
+    this.name = name;
+    this.topic = socket._wrap(format(name));
 }
 
 Emitter.extend(Channel);
 
 Channel.prototype.bind = Channel.prototype.on;
 
-Channel.prototype.subscribe = function (cb) {
+Channel.prototype.subscribe = function (opts, cb) {
+    if (typeof opts === 'function') {
+        cb = opts;
+        opts = null;
+    }
     var self = this;
-    this.adapter.subscribe(this.topic, this.options, function (err) {
+    this.adapter.subscribe(this.topic, opts, function (err) {
         if (cb) cb.call(self, err, self);
     });
     return this;
@@ -144,7 +146,7 @@ Channel.prototype.unsubscribe = function (cb) {
     return this;
 };
 
-Channel.prototype.__handleMessage = function (message) {
+Channel.prototype._handleMessage = function (message) {
     message = JSON.parse(message);
     if (message.__event__ && message.__data__) {
         this.emit(message.__event__, message.__data__);
@@ -158,13 +160,19 @@ Channel.prototype.__handleMessage = function (message) {
  * @param data
  */
 Channel.prototype.publish = function (event, data) {
-    this.socket.publish(this.name, event, data);
+    this.socket.publish(this.topic, event, data);
 };
 
+function format(path) {
+    return path.replace(/\:[a-zA-Z0-9]+/g, "+")
+        .replace(/\*\*/g, "#")
+        .replace(/\*/g, "+");
+}
 },{"./emitter":5}],4:[function(require,module,exports){
 "use strict";
 
 var Channel = require('./channel');
+var Router = require('./router');
 var utils = require('./utils');
 
 module.exports = Channels;
@@ -173,23 +181,31 @@ function Channels(socket) {
     this.socket = socket;
     this.key = socket.key;
     this.adapter = socket.adapter;
+
+    this.router = Router();
     this._channels = {};
 }
 
-Channels.prototype.add = function (cname, options, socket) {
-    return utils.sure(this._channels, cname, function () {
-        return createChannel(cname, options, socket);
-    });
-};
-
-Channels.prototype.remove = function (cname) {
-    var channel = this._channels[cname];
-    delete this._channels[cname];
+Channels.prototype.add = function (name, socket) {
+    var channel = this._channels[name];
+    if (channel) return channel;
+    channel = this._channels[name] = createChannel(name, socket);
+    this.router.addRoute(name, channel);
     return channel;
 };
 
-Channels.prototype.channel = function (cnameOrTopic) {
-    return this._channels[this.socket._decode(cnameOrTopic)];
+Channels.prototype.remove = function (name) {
+    var channel = this.find(name);
+    if (channel) {
+        delete this._channels[name];
+        this.router.removeRoute(channel);
+    }
+
+    return channel;
+};
+
+Channels.prototype.find = function (name) {
+    return this._channels[name];
 };
 
 Channels.prototype.unsubscribeAll = function (cb) {
@@ -201,10 +217,22 @@ Channels.prototype.unsubscribeAll = function (cb) {
     return utils.parallel(invokers, cb);
 };
 
-function createChannel(name, options, socket) {
-    return new Channel(name, options, socket);
+Channels.prototype._handleMessage = function (topic, message) {
+    topic = this.socket._unwrap(topic);
+    var matched = this.router.match(topic);
+    if (!matched) throw new Error('No channel to handle message with topic [' + topic + ']');
+    while (matched) {
+        matched.data._handleMessage(message);
+        matched = matched.next();
+    }
+};
+
+function createChannel(name, socket) {
+    return new Channel(name, socket);
 }
-},{"./channel":3,"./utils":7}],5:[function(require,module,exports){
+
+
+},{"./channel":3,"./router":6,"./utils":8}],5:[function(require,module,exports){
 "use strict";
 
 var utils = require('./utils');
@@ -365,7 +393,169 @@ Emitter.prototype.hasListeners = function (event) {
     return !!this.listeners(event).length;
 };
 
-},{"./utils":7}],6:[function(require,module,exports){
+},{"./utils":8}],6:[function(require,module,exports){
+/**
+ * Convert path to route object
+ *
+ * A string or RegExp should be passed,
+ * will return { re, src, keys} obj
+ *
+ * @param  {String / RegExp} path
+ * @return {Object}
+ */
+
+var Route = function (path) {
+    //using 'new' is optional
+
+    var src, re, keys = [];
+
+    if (path instanceof RegExp) {
+        re = path;
+        src = path.toString();
+    } else {
+        re = pathToRegExp(path, keys);
+        src = path;
+    }
+
+    return {
+        re: re,
+        src: src,
+        keys: keys
+    }
+};
+
+/**
+ * Normalize the given path string,
+ * returning a regular expression.
+ *
+ * An empty array should be passed,
+ * which will contain the placeholder
+ * key names. For example "/user/:id" will
+ * then contain ["id"].
+ *
+ * @param  {String} path
+ * @param  {Array} keys
+ * @return {RegExp}
+ */
+var pathToRegExp = function (path, keys) {
+    path = path
+        .concat('/?')
+        .replace(/\/\(/g, '(?:/')
+        .replace(/(\/)?(\.)?:(\w+)(?:(\(.*?\)))?(\?)?|\*/g, function (_, slash, format, key, capture, optional) {
+            if (_ === "*") {
+                keys.push(undefined);
+                return _;
+            }
+
+            keys.push(key);
+            slash = slash || '';
+            return ''
+                + (optional ? '' : slash)
+                + '(?:'
+                + (optional ? slash : '')
+                + (format || '') + (capture || '([^/]+?)') + ')'
+                + (optional || '');
+        })
+        .replace(/([\/.])/g, '\\$1')
+        .replace(/\*/g, '(.*)');
+    return new RegExp('^' + path + '$', 'i');
+};
+
+/**
+ * Attempt to match the given request to
+ * one of the routes. When successful
+ * a  {fn, params, splats} obj is returned
+ *
+ * @param  {Array} routes
+ * @param  {String} uri
+ * @param  {Number} startAt
+ * @return {Object}
+
+ */
+var match = function (routes, uri, startAt) {
+    var captures, i = startAt || 0, len, j;
+
+    for (len = routes.length; i < len; ++i) {
+        var route = routes[i],
+            re = route.re,
+            keys = route.keys,
+            splats = [],
+            params = {};
+
+        if (captures = uri.match(re)) {
+            for (j = 1, len = captures.length; j < len; ++j) {
+                var key = keys[j - 1],
+                    val = typeof captures[j] === 'string'
+                        ? decodeURI(captures[j])
+                        : captures[j];
+                if (key) {
+                    params[key] = val;
+                } else {
+                    splats.push(val);
+                }
+            }
+            return {
+                params: params,
+                splats: splats,
+                route: route.src,
+                next: i + 1
+            };
+        }
+    }
+};
+
+/**
+ * Default "normal" router constructor.
+ * accepts path, data tuples via addRoute
+ * returns {fn, params, splats, path}
+ *  via match
+ *
+ * @return {Object}
+ */
+
+function Router() {
+    this.routes = [];
+}
+
+Router.prototype.addRoute = function (path, data) {
+    if (!path) throw new Error(' route requires a path');
+    path = path.replace(/\$/, "\\$");
+    var route = Route(path);
+    route.data = data;
+
+    this.routes.push(route);
+};
+
+Router.prototype.removeRoute = function (data) {
+    if (!data) throw new Error('data must not be null');
+
+    var i, len = this.routes.length;
+    for (i = 0; i < len; i++) {
+        if (this.routes[i].data === data) break;
+    }
+    if (i < len) this.routes.splice(i, 1);
+};
+
+Router.prototype.match = function (path, startAt) {
+    var matched = match(this.routes, path, startAt);
+    if (matched) {
+        var route = this.routes[matched.next - 1];
+        matched.data = route.data;
+        matched.next = this.match.bind(this, path, matched.next)
+    }
+    return matched;
+};
+
+exports = module.exports = function () {
+    return new Router();
+};
+
+exports.Route = Route;
+exports.pathToRegExp = pathToRegExp;
+exports.match = match;
+
+
+},{}],7:[function(require,module,exports){
 "use strict";
 var debug = require('debug')('musher:socket');
 var utils = require('./utils');
@@ -442,20 +632,20 @@ Socket.prototype._enqueue = function (fn) {
 };
 
 Socket.prototype._message = function (topic, message) {
-    var c = this.channel(topic);
-    if (c) {
-        c.__handleMessage(message);
-    } else {
-        throw new Error('No channel to handle message with topic [' + topic + ']');
-    }
+    this.channels._handleMessage(topic, message);
 };
 
-Socket.prototype._encode = function (cname) {
-    return this.prefix && cname.indexOf(this.prefix) !== 0 ? this.prefix + cname : cname;
+Socket.prototype._wrap = function (topic) {
+    return this.prefix && topic.indexOf(this.prefix) !== 0 ? this.prefix + topic : topic;
 };
 
-Socket.prototype._decode = function (topic) {
+Socket.prototype._unwrap = function (topic) {
     return this.prefix && topic.indexOf(this.prefix) === 0 ? topic.substring(this.prefix.length) : topic;
+};
+
+Socket.prototype.ready = function (fn) {
+    if (this.connected) return fn();
+    this._enqueue(fn);
 };
 
 Socket.prototype.close = function (cb) {
@@ -463,29 +653,25 @@ Socket.prototype.close = function (cb) {
     this.adapter.close();
 };
 
-Socket.prototype.channel = function (nameOrTopic) {
-    return this.channels.channel(nameOrTopic);
+Socket.prototype.channel = function (name) {
+    return this.channels.find(name);
 };
 
-Socket.prototype.subscribe = function (cname, options, cb) {
-    if (typeof options === "function") {
-        cb = options;
-        options = null;
+Socket.prototype.subscribe = function (name, opts, cb) {
+    if (typeof opts === "function") {
+        cb = opts;
+        opts = null;
     }
-    var channel = this.channels.add(cname, options, this);
-    if (this.connected) {
-        channel.subscribe(cb);
-    } else {
-        this._enqueue(function () {
-            channel.subscribe(cb);
-        });
-    }
+    var channel = this.channels.add(name, this);
+    this.ready(function () {
+        channel.subscribe(opts, cb);
+    });
     return channel;
 };
 
-Socket.prototype.unsubscribe = function (cname, cb) {
+Socket.prototype.unsubscribe = function (name, cb) {
     cb = cb || utils.nop;
-    var channel = this.channels.remove(cname, cb);
+    var channel = this.channels.remove(name, cb);
     if (channel.connected) {
         channel.unsubscribe(cb);
     } else {
@@ -494,29 +680,19 @@ Socket.prototype.unsubscribe = function (cname, cb) {
     return this;
 };
 
-Socket.prototype.publish = function (cname, event, data) {
+Socket.prototype.publish = function (topic, event, data) {
     var socket = this;
-    if (!socket.connected) {
-        this._enqueue(function () {
-            socket._publish(cname, event, data);
-        });
-    } else {
-        socket._publish(cname, event, data);
-    }
-
+    this.ready(function () {
+        socket._publish(topic, event, data);
+    });
     return this;
 };
 
-Socket.prototype._publish = function (cname, event, data) {
+Socket.prototype._publish = function (topic, event, data) {
     var message = JSON.stringify({__event__: event, __data__: data});
-    this.adapter.publish(this._encode(cname), message);
+    this.adapter.publish(this._wrap(topic), message);
 };
-
-Socket.defaults = function (settings) {
-    utils.assign(defaults, settings);
-};
-
-},{"./channels":4,"./emitter":5,"./utils":7,"debug":8}],7:[function(require,module,exports){
+},{"./channels":4,"./emitter":5,"./utils":8,"debug":9}],8:[function(require,module,exports){
 "use strict";
 
 var breaker = {};
@@ -609,7 +785,7 @@ function parseAuthOptions(auth, opts) {
         }
     }
 }
-},{}],8:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 
 /**
  * This is the web browser implementation of `debug()`.
@@ -758,7 +934,7 @@ function load() {
 
 exports.enable(load());
 
-},{"./debug":9}],9:[function(require,module,exports){
+},{"./debug":10}],10:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -957,7 +1133,7 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":10}],10:[function(require,module,exports){
+},{"ms":11}],11:[function(require,module,exports){
 /**
  * Helpers.
  */
