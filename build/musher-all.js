@@ -1,11 +1,11 @@
 /***********************************************
-* Musher Javascript and Node.js Library v0.1.2
+* Musher Javascript and Node.js Library v0.1.4
 * https://github.com/taoyuan/musher
 * 
 * Copyright (c) 2014 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2014-09-01 15:16
+* Date: 2014-09-02 18:08
 ***********************************************/
 // Only expose a single object name in the global namespace.
 // Everything must go through this module. Global Messaging module
@@ -2223,7 +2223,7 @@ Channels.prototype._handleMessage = function (topic, message) {
         channel._handleMessage(message, {
             params: matched.params,
             splats: matched.splats,
-            path: matched.src,
+            path: matched.route,
             topic: topic
         });
         matched = matched.next();
