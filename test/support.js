@@ -31,7 +31,6 @@ exports.start = function (options, cb) {
     options = options || {};
     cb = cb || function () {};
 
-    console.log(options);
     var args = ['node', 'musherd'];
     for (var key in options) if (options.hasOwnProperty(key) && isValidOptions(key)) {
         args.push('--' + key);

@@ -35,6 +35,12 @@ describe('socket', function () {
             t.ok(socket.adapter);
         });
 
+        it('should updated settings', function () {
+            t.ok(socket);
+            t.ok(socket.settings.host);
+            t.ok(socket.settings.port);
+        });
+
         it('should publish with socket', function (done) {
             var data = {boo: 'foo'};
             var channel = socket.subscribe('tom');
