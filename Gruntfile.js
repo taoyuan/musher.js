@@ -27,7 +27,7 @@ module.exports = function (grunt) {
                 call: function (grunt, options, async) {
                     var done = async();
                     require('./test/support').start(options, function (err, server) {
-                        console.log('Mostel server is up and running');
+                        console.log('Musherd server is up and running');
                         grunt.mostelServer = server;
                         done();
                     });
@@ -38,7 +38,7 @@ module.exports = function (grunt) {
                     if (grunt.mostelServer) {
                         var done = async();
                         grunt.mostelServer.close(function () {
-                            console.log('Mostel server is closed');
+                            console.log('Musherd server is closed');
                             done();
                         });
                         grunt.mostelServer = null;

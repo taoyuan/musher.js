@@ -1,11 +1,11 @@
 /***********************************************
-* Musher Javascript and Node.js Library v0.1.5
+* Musher Javascript and Node.js Library v0.1.6
 * https://github.com/taoyuan/musher
 * 
 * Copyright (c) 2015 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2015-07-19 12:21
+* Date: 2015-07-19 12:54
 ***********************************************/
 // Only expose a single object name in the global namespace.
 // Everything must go through this module. Global Messaging module
@@ -2021,6 +2021,7 @@ exports.utils = require('./lib/utils');
 
 },{"./lib/adapters/paho":2,"./lib/socket":7,"./lib/utils":8}],2:[function(require,module,exports){
 "use strict";
+var merge = require('util-merge');
 var Emitter = require('../emitter');
 
 var defaultPort = 3883;
@@ -2032,24 +2033,33 @@ var defaultSecurePort = 4883;
 
 exports.initialize = function initialize(socket, utils) {
     var settings = socket.settings || {};
-    var opts = settings.options || {};
 
-    var clientId = settings.clientId || utils.makeId();
+    var host = settings.options.host || settings.host || defaultHost;
+    var port = Number(settings.options.port || settings.port || (settings.useSSL ? defaultSecurePort : defaultPort));
+    var clientId = settings.options.clientId || settings.clientId || utils.makeId();
 
-    if (settings.key) opts.userName = settings.key;
-    if (settings.secret) opts.password = settings.secret;
+    var options = {};
+    options.userName = settings.username || settings.key;
+    options.password = settings.password || settings.secret;
+    options.useSSL = !!settings.useSSL;
 
-    if ('useSSL' in settings) {
-        opts.useSSL = settings.useSSL;
-    }
+    merge(options, settings.options);
 
-    settings.port = Number(settings.port || (opts.useSSL ? defaultSecurePort : defaultPort));
+    delete options.host;
+    delete options.port;
+    delete options.clientId;
 
-    var client = socket.client = new Messaging.Client(settings.host, settings.port, clientId);
-    socket.adapter = new Paho(client, opts);
-}
+    Object.keys(options).forEach(function(key) {
+        if (options[key] === null || options[key] === undefined) {
+            delete options[key];
+        }
+    });
 
-function Paho(client, opts) {
+    var client = socket.client = new Messaging.Client(host, port, clientId);
+    socket.adapter = new Paho(client, options);
+};
+
+function Paho(client, options) {
     this.client = client;
 
     var adapter = this;
@@ -2060,12 +2070,12 @@ function Paho(client, opts) {
         adapter.emit('message', message.destinationName, message.payloadString);
     };
 
-    opts = opts || {};
-    opts.onSuccess = function onConnected() {
+    options = options || {};
+    options.onSuccess = function onConnected() {
         adapter.emit('connect');
     };
 
-    client.connect(opts);
+    client.connect(options);
 }
 
 Emitter.extend(Paho);
@@ -2096,7 +2106,7 @@ Paho.prototype.close = function () {
     return this.client.disconnect();
 };
 
-},{"../emitter":5}],3:[function(require,module,exports){
+},{"../emitter":5,"util-merge":12}],3:[function(require,module,exports){
 "use strict";
 
 var Emitter = require('./emitter');
@@ -3287,6 +3297,31 @@ function plural(ms, n, name) {
   if (ms < n * 1.5) return Math.floor(ms / n) + ' ' + name;
   return Math.ceil(ms / n) + ' ' + name + 's';
 }
+
+},{}],12:[function(require,module,exports){
+'use strict;'
+
+module.exports = Object.assign || function () {
+  var hasOwn = Object.prototype.hasOwnProperty;
+  var result = {};
+
+  var key,
+    obj,
+    i = 0;
+  var len = arguments.length;
+
+  for (; i < len; ++i) {
+    obj = arguments[i];
+
+    for (key in obj) {
+      if (hasOwn.call(obj, key)) {
+        result[key] = obj[key];
+      }
+    }
+  }
+
+  return result;
+};
 
 },{}]},{},[1])(1)
 });
