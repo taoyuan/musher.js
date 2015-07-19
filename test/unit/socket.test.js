@@ -126,7 +126,6 @@ describe('socket', function () {
     });
 
     describe('subscribe on connected', function () {
-
         it('should subscribe immediately', function (done) {
             var socket = s.connect('test_key');
             socket.on('connected', function () {
@@ -138,6 +137,13 @@ describe('socket', function () {
                 });
                 socket.publish('tom', 'data', data);
             });
+        })
+    });
+
+    describe('events', function () {
+        it('should emit offline event if cannot connect', function (done) {
+            var socket = s.connect({host: 'localhost', port: 6666});
+            socket.on('offline', done);
         })
     });
 });
