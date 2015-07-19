@@ -1,6 +1,6 @@
 "use strict";
 
-var mostel = require('mostel');
+var musherd = require('musherd');
 var s = require('../support');
 var t = s.t;
 
@@ -10,7 +10,7 @@ describe('integration', function () {
         args = null;
 
     beforeEach(function () {
-        args = ["node", "mostel"];
+        args = ["node", "musherd"];
     });
 
     afterEach(function (done) {
@@ -21,7 +21,7 @@ describe('integration', function () {
     });
 
     var startServer = function (callback) {
-        return mostel.cli(args, function (err, s) {
+        return musherd.cli(args, function (err, s) {
             server = s;
             callback(err, server);
         });

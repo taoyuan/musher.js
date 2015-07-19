@@ -1,6 +1,6 @@
 var chai = require('chai');
 var t = chai.assert;
-var mostel = require('mostel');
+var musherd = require('musherd');
 var musher = require('../');
 
 exports.t = t;
@@ -32,11 +32,11 @@ exports.start = function (options, cb) {
     cb = cb || function () {};
 
     console.log(options);
-    var args = ['node', 'mostel'];
+    var args = ['node', 'musherd'];
     for (var key in options) if (options.hasOwnProperty(key) && isValidOptions(key)) {
         args.push('--' + key);
         args.push(options[key]);
     }
-    mostel.cli(args, cb);
+    musherd.cli(args, cb);
 
 };
