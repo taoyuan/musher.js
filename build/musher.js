@@ -1,11 +1,11 @@
 /***********************************************
-* Musher Javascript and Node.js Library v0.1.6
+* Musher Javascript and Node.js Library v0.1.9
 * https://github.com/taoyuan/musher
 * 
 * Copyright (c) 2015 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2015-07-19 12:54
+* Date: 2015-07-23 18:04
 ***********************************************/
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.musher = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var Socket = require('./lib/socket');
@@ -25,7 +25,7 @@ exports.utils = require('./lib/utils');
 
 },{"./lib/adapters/paho":2,"./lib/socket":7,"./lib/utils":8}],2:[function(require,module,exports){
 "use strict";
-var merge = require('util-merge');
+var merge = require('utils-merge');
 var Emitter = require('../emitter');
 
 var defaultPort = 3883;
@@ -48,6 +48,7 @@ exports.initialize = function initialize(socket, utils) {
     options.useSSL = !!settings.useSSL;
 
     merge(options, settings.options);
+    merge(settings, options); // update settings
 
     delete options.host;
     delete options.port;
@@ -59,11 +60,13 @@ exports.initialize = function initialize(socket, utils) {
         }
     });
 
-    var client = socket.client = new Messaging.Client(host, port, clientId);
-    socket.adapter = new Paho(client, options);
+    if (options.userName && !options.password) delete options.userName;
+
+    var client = socket.client = new Paho.MQTT.Client(host, port, clientId);
+    socket.adapter = new PahoAdapter(client, options);
 };
 
-function Paho(client, options) {
+function PahoAdapter(client, options) {
     this.client = client;
 
     var adapter = this;
@@ -78,42 +81,61 @@ function Paho(client, options) {
     options.onSuccess = function onConnected() {
         adapter.emit('connect');
     };
+    options.onFailure = function (message) {
+        adapter.emit(new Error(message.errorMessage));
+    };
 
     client.connect(options);
 }
 
-Emitter.extend(Paho);
+Emitter.extend(PahoAdapter);
 
-Paho.prototype.__defineGetter__('connected', function () {
+PahoAdapter.prototype.__defineGetter__('connected', function () {
     return this.client.connected;
 });
 
-Paho.prototype.subscribe = function (topic, opts, cb) {
-    opts = opts || {};
-    if (cb) opts.onSuccess = cb;
+PahoAdapter.prototype.subscribe = function (topic, opts, cb) {
+    opts = opts || {qos: 1};
+    cb = cb || function () {};
+    opts.onSuccess = function (messsage) {
+        cb(null, messsage.grantedQos);
+    };
+    opts.onFailure = function (messsage) {
+        cb(messsage.errorCode);
+    };
     return this.client.subscribe(topic, opts);
 };
 
-Paho.prototype.unsubscribe = function (topic, opts, cb) {
+PahoAdapter.prototype.unsubscribe = function (topic, opts, cb) {
     opts = opts || {};
-    if (cb) opts.onSuccess = cb;
+    cb = cb || function () {};
+    opts.onSuccess = function (messsage) {
+        cb();
+    };
     return this.client.unsubscribe(topic, opts);
 };
 
-Paho.prototype.publish = function (topic, message) {
-    var m = new Messaging.Message(message);
+PahoAdapter.prototype.publish = function (topic, message) {
+    var m = new Paho.MQTT.Message(message);
     m.destinationName = topic;
     return this.client.send(m);
 };
 
-Paho.prototype.close = function () {
-    return this.client.disconnect();
+PahoAdapter.prototype.close = function () {
+    try {
+        this.client.disconnect();
+    } catch (e) {
+        console.warn(e.message);
+        this.emit('close');
+    }
 };
 
-},{"../emitter":5,"util-merge":12}],3:[function(require,module,exports){
+},{"../emitter":5,"utils-merge":13}],3:[function(require,module,exports){
 "use strict";
 
 var Emitter = require('./emitter');
+
+var __ID = 0;
 
 module.exports = Channel;
 
@@ -121,6 +143,7 @@ function Channel(name, socket) {
     if (!(this instanceof Channel)) {
         return new Channel(name, socket);
     }
+    this.id = __ID++;
     this.socket = socket;
     this.adapter = socket.adapter;
     this.name = name;
@@ -134,11 +157,11 @@ Channel.prototype.bind = Channel.prototype.on;
 Channel.prototype.subscribe = function (opts, cb) {
     if (typeof opts === 'function') {
         cb = opts;
-        opts = null;
+        opts = undefined;
     }
-    var self = this;
+    var that = this;
     this.adapter.subscribe(this.topic, opts, function (err) {
-        if (cb) cb.call(self, err, self);
+        if (cb) cb.call(that, err, that);
     });
     return this;
 };
@@ -159,8 +182,10 @@ Channel.prototype.unsubscribe = function (cb) {
 Channel.prototype._handleMessage = function (message, route) {
     message = JSON.parse(message);
     var event = message.__event__ || route.params.event || 'message';
-    var data = message.__data__ || message;
+    var data = ('__data__' in message) ? message.__data__ : message;
+    route.event = event;
     this.emit(event, data, route);
+    if (this.handler) this.handler(data, route);
 };
 
 /**
@@ -200,7 +225,7 @@ Channels.prototype.add = function (name, socket) {
     var channel = this._channels[name];
     if (channel) return channel;
     channel = this._channels[name] = createChannel(name, socket);
-    this.router.addRoute(name, channel);
+    this.router.addRoute(name, name);
     return channel;
 };
 
@@ -208,7 +233,7 @@ Channels.prototype.remove = function (name) {
     var channel = this.find(name);
     if (channel) {
         delete this._channels[name];
-        this.router.removeRoute(channel);
+        this.router.removeRoute(name);
     }
 
     return channel;
@@ -219,9 +244,9 @@ Channels.prototype.find = function (name) {
 };
 
 Channels.prototype.unsubscribeAll = function (cb) {
-    if (!this.channels) return cb();
+    if (!this._channels) return cb();
     var invokers = [];
-    utils.each(this.channels, function (channel) {
+    utils.each(this._channels, function (channel) {
         invokers.push(channel.unsubscribe.bind(channel));
     });
     return utils.parallel(invokers, cb);
@@ -233,12 +258,12 @@ Channels.prototype._handleMessage = function (topic, message) {
     if (!matched) throw new Error('No channel to handle message with topic [' + topic + ']');
     var channel;
     while (matched) {
-        channel = matched.data;
+        channel = this._channels[matched.data];
         channel._handleMessage(message, {
+            topic: topic,
             params: matched.params,
             splats: matched.splats,
-            path: matched.route,
-            topic: topic
+            path: matched.route
         });
         matched = matched.next();
     }
@@ -372,8 +397,8 @@ Emitter.prototype.off =
 
 Emitter.prototype.emit = function (event) {
     this._callbacks = this._callbacks || {};
-    var args = [].slice.call(arguments, 1)
-        , callbacks = this._callbacks[event];
+    var args = [].slice.call(arguments, 1),
+        callbacks = this._callbacks[event];
 
     if (callbacks) {
         callbacks = callbacks.slice(0);
@@ -573,6 +598,7 @@ exports.match = match;
 
 
 },{}],7:[function(require,module,exports){
+(function (process){
 "use strict";
 var debug = require('debug')('musher:socket');
 var utils = require('./utils');
@@ -589,7 +615,7 @@ function Socket(adapter, opts) {
     }
 
     // just save everything we get
-    var settings = this.settings = utils.assign({ host: defaultHost }, opts);
+    var settings = this.settings = utils.assign({host: defaultHost}, opts);
     this.key = settings.key;
     this.prefix = this.key ? '$' + this.key + ':' : null;
 
@@ -611,18 +637,26 @@ function Socket(adapter, opts) {
 
     this.channels = new Channels(this);
 
-    var socket = this;
-    this.adapter.on('error', function () {
-        socket.emit('error')
+    var that = this;
+    this.adapter.on('error', function (err) {
+        that.emit('error', err)
     });
     this.adapter.on('connect', function () {
-        socket._connected();
+        that._connected();
+    });
+    this.adapter.on('reconnect', function () {
+        that.emit('reconnect')
+    });
+    this.adapter.on('offline', function () {
+        that.emit('offline')
     });
     this.adapter.on('close', function () {
-        socket._close();
+        that._close();
     });
     this.adapter.on('message', function (topic, message, packet) {
-        socket._message(topic, message);
+        process.nextTick(function () {
+            that._message(topic, message);
+        });
     });
 }
 
@@ -674,14 +708,24 @@ Socket.prototype.channel = function (name) {
     return this.channels.find(name);
 };
 
-Socket.prototype.subscribe = function (name, opts, cb) {
+/**
+ *
+ * @param topic
+ * @param opts
+ * @param handler function(data, route), `data` is the message body, `route` is an object includes:
+ *  {topic: String, event: String = 'message', params: Object, slats: Array, path: String}
+ */
+Socket.prototype.subscribe = function (topic, opts, handler) {
     if (typeof opts === "function") {
-        cb = opts;
+        handler = opts;
         opts = null;
     }
-    var channel = this.channels.add(name, this);
+    var channel = this.channels.add(topic, this);
+    channel.handler = handler;
     this.ready(function () {
-        channel.subscribe(opts, cb);
+        channel.subscribe(opts, function (err) {
+            if (err) throw err;
+        });
     });
     return channel;
 };
@@ -689,6 +733,7 @@ Socket.prototype.subscribe = function (name, opts, cb) {
 Socket.prototype.unsubscribe = function (name, cb) {
     cb = cb || utils.nop;
     var channel = this.channels.remove(name, cb);
+    channel.handler = null;
     if (channel.connected) {
         channel.unsubscribe(cb);
     } else {
@@ -707,13 +752,17 @@ Socket.prototype.publish = function (topic, event, data) {
 
 Socket.prototype._publish = function (topic, event, data) {
     if (!topic) throw new Error('`topic` must not be null');
-    if (!event) throw new Error('`event` must not be null');
-    if (!data) throw new Error('`data` must not be null');
+    if (typeof event !== 'string') {
+        data = event;
+        event = null;
+    }
 
-    var message = JSON.stringify({__event__: event, __data__: data});
-    this.adapter.publish(this._wrap(topic), message);
+    topic = this._wrap(topic);
+    var message = JSON.stringify(event ? {__event__: event, __data__: data} : data);
+    this.adapter.publish(topic, message);
 };
-},{"./channels":4,"./emitter":5,"./utils":8,"debug":9}],8:[function(require,module,exports){
+}).call(this,require('_process'))
+},{"./channels":4,"./emitter":5,"./utils":8,"_process":12,"debug":9}],8:[function(require,module,exports){
 "use strict";
 
 var breaker = {};
@@ -731,7 +780,8 @@ exports = module.exports = {
     parallel: parallel,
     sure: sure,
     makeId: makeId,
-    parseAuthOptions: parseAuthOptions
+    parseAuthOptions: parseAuthOptions,
+    ensureSlashBefore: ensureSlashBefore
 };
 
 function nop() {
@@ -805,6 +855,11 @@ function parseAuthOptions(auth, opts) {
             opts.password = auth.secret;
         }
     }
+}
+
+function ensureSlashBefore(str) {
+    if (!str) return str;
+    return str[0] === '/' ? str : '/' + str;
 }
 },{}],9:[function(require,module,exports){
 
@@ -1303,28 +1358,120 @@ function plural(ms, n, name) {
 }
 
 },{}],12:[function(require,module,exports){
-'use strict;'
+// shim for using process in browser
 
-module.exports = Object.assign || function () {
-  var hasOwn = Object.prototype.hasOwnProperty;
-  var result = {};
+var process = module.exports = {};
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
 
-  var key,
-    obj,
-    i = 0;
-  var len = arguments.length;
+function cleanUpNextTick() {
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
+    } else {
+        queueIndex = -1;
+    }
+    if (queue.length) {
+        drainQueue();
+    }
+}
 
-  for (; i < len; ++i) {
-    obj = arguments[i];
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    var timeout = setTimeout(cleanUpNextTick);
+    draining = true;
 
-    for (key in obj) {
-      if (hasOwn.call(obj, key)) {
-        result[key] = obj[key];
-      }
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            currentQueue[queueIndex].run();
+        }
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    clearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        setTimeout(drainQueue, 0);
+    }
+};
+
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+};
+
+// TODO(shtylman)
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function() { return 0; };
+
+},{}],13:[function(require,module,exports){
+/**
+ * Merge object b with object a.
+ *
+ *     var a = { foo: 'bar' }
+ *       , b = { bar: 'baz' };
+ *
+ *     merge(a, b);
+ *     // => { foo: 'bar', bar: 'baz' }
+ *
+ * @param {Object} a
+ * @param {Object} b
+ * @return {Object}
+ * @api public
+ */
+
+exports = module.exports = function(a, b){
+  if (a && b) {
+    for (var key in b) {
+      a[key] = b[key];
     }
   }
-
-  return result;
+  return a;
 };
 
 },{}]},{},[1])(1)

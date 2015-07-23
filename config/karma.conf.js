@@ -45,6 +45,6 @@ module.exports = function (config) {
         // - Opera
         // - Safari
         // - PhantomJS
-        browsers: [ 'Chrome' ]
+        browsers: [ 'Chrome', 'Firefox' ]
     })
 };

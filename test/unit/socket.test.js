@@ -163,6 +163,6 @@ describe('socket', function () {
             });
 
             socket.publish('/hello', {foo: 'bar'});
-        })
+        });
     });
 });

@@ -27,6 +27,6 @@
     "tests"
   ],
   "dependencies": {
-    "bower-mqttws": "*"
+    "bower-mqttws": "^1.0.0"
   }
 }
