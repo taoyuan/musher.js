@@ -35,7 +35,7 @@ socket.on('error', function (err) {
 });
 
 socket.subscribe('/users/:userid/message/:messageid/*', function (data, route) {
-    console.log(data);              // { hello: 'world' }
+    console.log(data);            // { hello: 'world' }
     console.log(route.topic);     // '/users/ty/message/4321/ping'
     console.log(route.params);    // { userid: 'ty', messageid: 4321 }
     console.log(route.splats);    // [ 'ping' ]
@@ -68,7 +68,7 @@ socket.on('error', function (err) {
 
 var channel = socket.subscribe('/users/:userid/message/:messageid/*');
 channel.on('data', function (data, route) {
-    console.log(data);              // { hello: 'world' }
+    console.log(data);            // { hello: 'world' }
     console.log(route.topic);     // '/users/ty/message/4321/ping'
     console.log(route.params);    // { userid: 'ty', messageid: 4321 }
     console.log(route.splats);    // [ 'ping' ]
