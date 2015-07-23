@@ -1,5 +1,11 @@
 var Socket = require('./lib/socket');
 
+/**
+ *
+ * @param key
+ * @param settings
+ * @returns {Socket|exports|module.exports}
+ */
 exports.connect = function (key, settings) {
     if (typeof key === 'object') {
         settings = key;

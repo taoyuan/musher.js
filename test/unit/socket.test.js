@@ -152,4 +152,17 @@ describe('socket', function () {
             socket.on('offline', done);
         })
     });
+
+    describe('subscribe with handler', function () {
+        it('should call the handler', function (done) {
+            var socket = s.connect();
+            socket.subscribe('/hello', function (data, route) {
+                t.equal(route.topic, '/hello');
+                t.deepEqual(data, {foo: 'bar'});
+                done();
+            });
+
+            socket.publish('/hello', {foo: 'bar'});
+        })
+    });
 });
