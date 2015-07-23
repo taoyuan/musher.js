@@ -1,6 +1,6 @@
 {
   "name": "musher",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Musher Javascript and Node.js Library",
   "main": "./index.js",
   "browser": "./browser.js",
