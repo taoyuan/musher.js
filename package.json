@@ -52,7 +52,6 @@
     "musherd": "taoyuan/musherd"
   },
   "scripts": {
-    "postinstall": "node_modules/.bin/bower install",
     "test": "grunt test-mocha"
   }
 }

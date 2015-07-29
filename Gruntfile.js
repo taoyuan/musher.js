@@ -89,7 +89,7 @@ module.exports = function (grunt) {
                 },
                 files: {
                     'build/<%= pkg.name %>.js': 'build/<%= pkg.name %>.browserify.js',
-                    'build/<%= pkg.name %>-all.js': ['bower_components/bower-mqttws/mqttws31.js', 'build/<%= pkg.name %>.browserify.js']
+                    'build/<%= pkg.name %>-all.js': ['3rd/mqttws/mqttws31.js', 'build/<%= pkg.name %>.browserify.js']
                 }
             }
         },
