@@ -1,11 +1,11 @@
 /***********************************************
-* Musher Javascript and Node.js Library v0.2.2
+* Musher Javascript and Node.js Library v0.2.3
 * https://github.com/taoyuan/musher
 * 
 * Copyright (c) 2015 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2015-07-30 10:21
+* Date: 2015-07-30 10:22
 ***********************************************/
 // Only expose a single object name in the global namespace.
 // Everything must go through this module. Global Paho.MQTT module
