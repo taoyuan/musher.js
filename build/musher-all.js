@@ -1,11 +1,11 @@
 /***********************************************
-* Musher Javascript and Node.js Library v0.2.3
+* Musher Javascript and Node.js Library v0.3.0
 * https://github.com/taoyuan/musher
 * 
 * Copyright (c) 2015 Tao Yuan.
 * Licensed MIT 
 * 
-* Date: 2015-07-30 10:22
+* Date: 2015-12-23 14:29
 ***********************************************/
 // Only expose a single object name in the global namespace.
 // Everything must go through this module. Global Paho.MQTT module
@@ -2816,7 +2816,7 @@ Socket.prototype.publish = function (topic, event, data) {
 
 Socket.prototype._publish = function (topic, event, data) {
     if (!topic) throw new Error('`topic` is required');
-    if (typeof event !== 'string' && arguments.length > 2) {
+    if (data === null || data === undefined) {
         data = event;
         event = null;
     }
@@ -3454,7 +3454,9 @@ function drainQueue() {
         currentQueue = queue;
         queue = [];
         while (++queueIndex < len) {
-            currentQueue[queueIndex].run();
+            if (currentQueue) {
+                currentQueue[queueIndex].run();
+            }
         }
         queueIndex = -1;
         len = queue.length;
@@ -3506,7 +3508,6 @@ process.binding = function (name) {
     throw new Error('process.binding is not supported');
 };
 
-// TODO(shtylman)
 process.cwd = function () { return '/' };
 process.chdir = function (dir) {
     throw new Error('process.chdir is not supported');
